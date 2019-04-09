@@ -11,9 +11,11 @@
 #include <time.h>
 #include <math.h>
 
+#include <getopt.h>
 #include <dirent.h>
 #include <errno.h>
 #include <unistd.h>
+#include <regex.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -26,34 +28,72 @@ typedef struct {
     int len;
 } string_list;
 
+/* search result type */
+typedef struct {
+    string_list roots, codes, bins;
+} search_result;
+
 /* compile-time constants */
 #define HOME_DATA_SUFFIX ".cache/lmc"
+#define LINEBUF_SIZE 512
 
 /* options / paths */
 static char* data_dir;    /* default: $HOME/.cache/lmc or /tmp/lmc.XXXX if HOME is not set */
 static char* module_path; /* default: $MODULEPATH */
+static int   verbose;
 
 /* globals */
 static sqlite3*    db_connection;
 static string_list module_roots;
 
+/* prepared statements */
+static const char* stmt_src_add_bin = "insert into binaries values (?, ?, ?)";
+static const char* stmt_src_search_bin_exact = "select * from binaries where bin=?";
+
+static sqlite3_stmt* stmt_add_bin;
+static sqlite3_stmt* stmt_search_bin_exact;
+
+/* regular expressions */
+static const char* reg_src_lmod = "^[[:space:]]*(prepend_path|append_path)" \
+                                  "[[:space:]]*\\([[:space:]]*\"PATH\"[[:space:]]*" \
+                                  ",[[:space:]]*\"([^\"]+)\"[[:space:]]*\\)[[:space:]]*$";
+
+static regex_t reg_lmod;
+
 /* db functions */
 int  db_init();
 void db_free();
+int  db_begin_transaction();
+int  db_end_transaction();
 int  db_flush_binaries();
 
 /* crawling functions */
 int build_root(char* root);
+int build_module_dir(char* root, char* module_dir, char* module_name);
+int build_module_file(char* root, char* module_name, char* module_file_name, char* module_file_path);
+int build_potential_path(char* root, char* code, char* path);
+
+/* parsing functions */
+int extract_lmod(char* path, string_list* list);
+
+/* searching functions */
+search_result search_binary(char* bin);
 
 /* util functions */
+int   init_regex();                     /* initialize regular expressions */
 int   init_datapath(char* user_path);   /* initialize data paths */
 void  init_modulepath(char* user_path); /* initialize module paths */
 int   path_try(char* path);             /* verify a path can be used as a directory */
 char* join_path(char* a, char* b);      /* join two paths */
+void  usage(char* a0);                  /* print usage info */
 
 /* string_list functions */
 void string_list_append(string_list* l, char* item);
 void string_list_free(string_list* l);
+
+/* search_result functions */
+void search_result_append(search_result* list, char* root, char* code, char* bin);
+void search_result_free(search_result* list);
 
 /*
  * main(...)
@@ -61,26 +101,87 @@ void string_list_free(string_list* l);
  * program entry point
  */
 int main(int argc, char** argv) {
+    int opt;
+    char* user_datapath = NULL, *user_modulepath = NULL, *subcommand = NULL;
+
+    while ((opt = getopt(argc, argv, "d:m:v")) != -1) {
+        switch (opt) {
+        case 'd':
+            user_datapath = optarg;
+            break;
+        case 'm':
+            user_modulepath = optarg;
+            break;
+        case 'v':
+            verbose = 1;
+            break;
+        default:
+            fprintf(stderr, "error: unrecognized option '%c'\n", opt);
+        case '?':
+            usage(*argv);
+            return -1;
+        }
+    }
+
+    if (optind < argc) {
+        subcommand = argv[optind];
+    } else {
+        usage(*argv);
+        return -1;
+    }
+
     /* seed prng */
     srand(time(NULL));
 
-    if (init_datapath(NULL)) {
+    if (init_datapath(user_datapath)) {
         fprintf(stderr, "error: couldn't initialize any valid data directories!\n");
         return EXIT_FAILURE;
     }
 
-    fprintf(stderr, "note: proceeding with verified data directory %s\n", data_dir);
+    if (verbose) fprintf(stderr, "note: proceeding with verified data directory %s\n", data_dir);
 
-    init_modulepath(NULL);
+    init_modulepath(user_modulepath);
 
-    if (db_init()) {
-        return -1;
+    if (init_regex()) {
+        return EXIT_FAILURE;
     }
 
-    if (db_flush_binaries()) return -1;
+    if (db_init()) {
+        return EXIT_FAILURE;
+    }
+
+    if (!strcmp(subcommand, "help")) {
+        usage(*argv);
+        return 0;
+    } else if (!strcmp(subcommand, "build")) {
+        printf("Building cache..\n");
+
+        if (db_flush_binaries()) return -1;
+
+        if (db_begin_transaction()) return -1;
+        for (int i = 0; i < module_roots.len; ++i) {
+            build_root(module_roots.list[i]);
+        }
+        if (db_end_transaction()) return -1;
+    } else if (!strcmp(subcommand, "search")) {
+        if (++optind >= argc) {
+            db_free();
+            usage(*argv);
+            return -1;
+        }
+
+        search_result res = search_binary(argv[optind]);
+
+        for (int i = 0; i < res.bins.len; ++i) {
+            printf("=> root=\"%s\", code=\"%s\", bin=\"%s\"\n", res.roots.list[i], res.codes.list[i], res.bins.list[i]);
+        }
+
+        search_result_free(&res);
+    }
+
 
     db_free();
-    fprintf(stderr, "Bye\n");
+    if (verbose) fprintf(stderr, "Bye\n");
     return 0;
 }
 
@@ -106,9 +207,20 @@ int db_init() {
     }
 
     /* create binaries table */
-    if (sqlite3_exec(db_connection, "create table if not exists binaries (root text, module_code text, bin_name tinytext)",
+    if (sqlite3_exec(db_connection, "create table if not exists binaries (root text, code text, bin tinytext)",
                      NULL, NULL, &sql_error)) {
         fprintf(stderr, "error: failed to initialize binaries table: %s\n", sql_error);
+        return -1;
+    }
+
+    /* create prepared statements */
+    if (sqlite3_prepare_v2(db_connection, stmt_src_add_bin, strlen(stmt_src_add_bin), &stmt_add_bin, NULL)) {
+        fprintf(stderr, "error: failed to initialize add_bin statement: %s\n", sqlite3_errmsg(db_connection));
+        return -1;
+    }
+
+    if (sqlite3_prepare_v2(db_connection, stmt_src_search_bin_exact, strlen(stmt_src_search_bin_exact), &stmt_search_bin_exact, NULL)) {
+        fprintf(stderr, "error: failed to initialize search_bin_exact statement: %s\n", sqlite3_errmsg(db_connection));
         return -1;
     }
 
@@ -126,6 +238,42 @@ void db_free() {
 }
 
 /*
+ * db_begin_transaction()
+ * start a database transaction
+ *
+ * should be called before rebuilding the cache
+ * returns nonzero if bad things happen
+ */
+int db_begin_transaction() {
+    char* sql_error;
+
+    if (sqlite3_exec(db_connection, "begin transaction", NULL, NULL, &sql_error)) {
+        fprintf(stderr, "error: failed to begin transaction: %s\n", sql_error);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
+ * db_end_transaction()
+ * end a database transaction
+ *
+ * should be after rebuilding the cache
+ * returns nonzero if bad things happen
+ */
+int db_end_transaction() {
+    char* sql_error;
+
+    if (sqlite3_exec(db_connection, "end transaction", NULL, NULL, &sql_error)) {
+        fprintf(stderr, "error: failed to end transaction: %s\n", sql_error);
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
  * db_flush_binaries()
  *
  * clear all binary entries from the database
@@ -138,7 +286,7 @@ int db_flush_binaries() {
         return -1;
     }
 
-    fprintf(stderr, "note: flushed all binaries from database\n");
+    if (verbose) fprintf(stderr, "note: flushed all binaries from database\n");
     return 0;
 }
 
@@ -208,7 +356,7 @@ void init_modulepath(char* user_path) {
     tmp_module_path = strdup(module_path);
     for (cur_path = strtok(tmp_module_path, ":"); cur_path; cur_path = strtok(NULL, ":")) {
         string_list_append(&module_roots, cur_path);
-        fprintf(stderr, "note: using module root %s\n", cur_path);
+        if (verbose) fprintf(stderr, "note: using module root %s\n", cur_path);
     }
     free(tmp_module_path);
 }
@@ -278,7 +426,7 @@ char* join_path(char* a, char* b) {
 void string_list_append(string_list* l, char* item) {
     l->len++;
     l->list = realloc(l->list, l->len * sizeof(char*));
-    l->list[l->len - 1] = item;
+    l->list[l->len - 1] = strdup(item);
 }
 
 /*
@@ -290,10 +438,271 @@ void string_list_append(string_list* l, char* item) {
  * returns nonzero if something goes wrong
  */
 int build_root(char* root) {
-    /*
-     * first, we must remove any binary entries from this root.
-     * this can be done with a single prepared statement.
-     */
+    DIR* d;
+    struct dirent* dp;
+    struct stat st;
+
+    /* try and walk the root */
+    if (!(d = opendir(root))) {
+        fprintf(stderr, "warning: couldn't open module root %s: %m\n", root);
+        return -1;
+    }
+
+    while ((dp = readdir(d))) {
+        if (!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, "..")) continue;
+
+        char* abs_path = join_path(root, dp->d_name);
+
+        if (stat(abs_path, &st)) {
+            fprintf(stderr, "warning: stat() failed for %s: %m\n", abs_path);
+            free(abs_path);
+            continue;
+        }
+
+        if ((st.st_mode & S_IFMT) == S_IFDIR) {
+            build_module_dir(root, abs_path, dp->d_name);
+        }
+
+        free(abs_path);
+    }
+
+    return 0;
+}
+
+/*
+ * build_module_dir(root, dir, name)
+ * builds the cache for a module directory (one level below a root)
+ *
+ * root: module root directory (passed from build_root())
+ * dir: module directory
+ * name: module name
+ *
+ * returns nonzero if something goes wrong
+ */
+int build_module_dir(char* root, char* module_dir, char* name) {
+    DIR* d;
+    struct dirent* dp;
+    struct stat st;
+
+    /* try and walk the dir */
+    if (!(d = opendir(module_dir))) {
+        fprintf(stderr, "warning: couldn't open module dir %s: %m\n", module_dir);
+        return -1;
+    }
+
+    while ((dp = readdir(d))) {
+        char* abs_path = join_path(module_dir, dp->d_name);
+
+        if (stat(abs_path, &st)) {
+            fprintf(stderr, "warning: stat() failed for %s: %m\n", abs_path);
+            free(abs_path);
+            continue;
+        }
+
+        switch (st.st_mode & S_IFMT) {
+        case S_IFREG:
+        case S_IFLNK:
+            build_module_file(root, name, dp->d_name, abs_path);
+            break;
+        }
+
+        free(abs_path);
+    }
+
+    return 0;
+}
+
+/*
+ * build_module_file(root, name, file_name, file_path)
+ * builds a single module file
+ *
+ * root: module root path
+ * module_name: module directory basename
+ * module_file_name: module file basename
+ * module_file_path: full module file path
+ *
+ * returns nonzero if something goes wrong
+ */
+int build_module_file(char* root, char* module_name, char* module_file_name, char* module_file_path) {
+    char* code;
+
+    /* compute the module code */
+    code = join_path(module_name, module_file_name);
+
+    /* chop off .lua extensions */
+    if (!strcmp(code + strlen(code) - 4, ".lua")) {
+        code[strlen(code) - 4] = 0;
+    }
+
+    string_list paths = {0};
+
+    if (verbose) fprintf(stderr, "note: building %s from %s\n", code, module_file_path);
+    extract_lmod(module_file_path, &paths);
+
+    if (verbose) fprintf(stderr, "note: searching %d potential paths for %s\n", paths.len, code);
+    
+    for (int i = 0; i < paths.len; ++i) {
+        build_potential_path(root, code, paths.list[i]);
+    }
+
+    free(code);
+
+    return 0;
+}
+
+/*
+ * build_potential_path(root, code, path)
+ * searches a potential PATH for binaries
+ *
+ * root: module root
+ * code: module code
+ * path: PATH value
+ *
+ * return nonzero if something goes wrong
+ */
+int build_potential_path(char* root, char* code, char* path) {
+    DIR* d;
+    struct dirent* dp;
+    struct stat st;
+    int res;
+
+    /* try and walk the dir */
+    if (!(d = opendir(path))) {
+        fprintf(stderr, "warning: couldn't open potential path %s (from %s): %m\n", path, code);
+        return -1;
+    }
+
+    while ((dp = readdir(d))) {
+        char* abs_path = join_path(path, dp->d_name);
+
+        if (stat(abs_path, &st)) {
+            fprintf(stderr, "warning: stat() failed for %s: %m\n", abs_path);
+            free(abs_path);
+            continue;
+        }
+
+        switch (st.st_mode & S_IFMT) {
+        case S_IFREG:
+        case S_IFLNK:
+            /* check that we have execute permission */
+            if (access(abs_path, X_OK)) continue;
+
+            res = sqlite3_bind_text(stmt_add_bin, 1, root, strlen(root), SQLITE_TRANSIENT) ||
+                  sqlite3_bind_text(stmt_add_bin, 2, code, strlen(code), SQLITE_TRANSIENT) ||
+                  sqlite3_bind_text(stmt_add_bin, 3, dp->d_name, strlen(dp->d_name), SQLITE_TRANSIENT);
+
+            /* OK, we can bind parameters and insert the binary into the db */
+            if (res) {
+                fprintf(stderr, "error: unexpected failure binding parameter to add_bin: %s\n", sqlite3_errmsg(db_connection));
+                free(abs_path);
+                continue;
+            }
+
+            if (sqlite3_step(stmt_add_bin) != SQLITE_DONE) {
+                fprintf(stderr, "error: error executing add_bin statement: %s\n", sqlite3_errmsg(db_connection));
+                free(abs_path);
+                continue;
+            }
+
+            sqlite3_reset(stmt_add_bin);
+            break;
+        }
+
+        free(abs_path);
+    }
+
+    return 0;
+}
+
+/*
+ * extract_lmod(path, list)
+ * extracts additional PATH variables from Lmod files
+ *
+ * path: path to module file
+ * list: destination string list
+ */
+int extract_lmod(char* path, string_list* list) {
+    FILE* f;
+    char linebuf[LINEBUF_SIZE];
+    int len, count;
+    regmatch_t matches[3];
+
+    if (!(f = fopen(path, "r"))) { 
+        fprintf(stderr, "warning: couldn't open %s for reading: %m\n", path);
+        return -1;
+    }
+
+    count = 0;
+    while (fgets(linebuf, sizeof linebuf, f)) {
+        /* strip newline */
+        len = strlen(linebuf);
+        if (linebuf[len - 1] == '\n') linebuf[len - 1] = 0;
+
+        /* execute regex */
+        if (!regexec(&reg_lmod, linebuf, 3, matches, 0)) {
+            if (matches[2].rm_so < 0) continue;
+            linebuf[matches[2].rm_eo] = 0;
+            string_list_append(list, linebuf + matches[2].rm_so);
+            ++count;
+        }
+    }
+
+    fclose(f);
+
+    if (verbose) fprintf(stderr, "note: extract_lmod() pulled %d paths from %s\n", count, path);
+    return 0;
+}
+
+/*
+ * search_binary(bin)
+ * searches the database for providers for a binary
+ *
+ * bin: command to search for
+ */
+search_result search_binary(char* bin) {
+    search_result out = {0};
+    int res;
+
+    if (sqlite3_bind_text(stmt_search_bin_exact, 1, bin, strlen(bin), SQLITE_TRANSIENT)) {
+        fprintf(stderr, "error: failed to bind parameter to search_bin_exact: %s\n", sqlite3_errmsg(db_connection));
+        return out;
+    }
+
+    while (1) {
+        res = sqlite3_step(stmt_search_bin_exact);
+
+        if (res == SQLITE_ROW) {
+            char* root = (char*) sqlite3_column_text(stmt_search_bin_exact, 0);
+            char* code = (char*) sqlite3_column_text(stmt_search_bin_exact, 1);
+
+            search_result_append(&out, root, code, bin);
+        }
+
+        if (res == SQLITE_DONE) {
+            break;
+        }
+    }
+
+    sqlite3_reset(stmt_search_bin_exact);
+    return out;
+}
+
+/*
+ * init_regex()
+ * initializes regular expressions
+ *
+ * must be called before any module parsing is done (via lmod)
+ * returns nonzero on compilation failure
+ */
+int init_regex() {
+    int res;
+    char ebuf[LINEBUF_SIZE];
+
+    if ((res = regcomp(&reg_lmod, reg_src_lmod, REG_EXTENDED | REG_NEWLINE))) {
+        regerror(res, &reg_lmod, ebuf, sizeof ebuf);
+        fprintf(stderr, "error: failed to compile lmod regex: %s\n", ebuf);
+        return -1;
+    }
 
     return 0;
 }
@@ -308,4 +717,42 @@ int build_root(char* root) {
 void string_list_free(string_list* l) {
     while (l->len) free(l->list[--l->len]);
     free(l->list);
+}
+
+/*
+ * search_result_append(list, root, code, bin)
+ * append an entry to a search result
+ *
+ * list: list to append to
+ * root: module root
+ * code: module code
+ * bin:  provided binary
+ */
+void search_result_append(search_result* list, char* root, char* code, char* bin) {
+    string_list_append(&list->roots, root);
+    string_list_append(&list->codes, code);
+    string_list_append(&list->bins, bin);
+}
+
+/*
+ * search_result_free(list)
+ * free entries from a search result
+ *
+ * list: results to free
+ */
+void search_result_free(search_result* list) {
+    string_list_free(&list->roots);
+    string_list_free(&list->codes);
+    string_list_free(&list->bins);
+}
+
+/*
+ * usage(a0)
+ * prints usage information
+ *
+ * a0: argv[0]
+ */
+void usage(char* a0) {
+    /* TODO: write this */
+    fprintf(stderr, "usage: %s [OPTIONS] <SUBCOMMAND>\n", a0);
 }
