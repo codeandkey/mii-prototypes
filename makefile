@@ -2,7 +2,7 @@ CC      = gcc
 CFLAGS  = -std=gnu99 -Wall -Werror -Wno-unused-value -g
 LDFLAGS = -lsqlite3
 
-OUTPUT = lmc
+OUTPUT = bin/lmc
 
 SOURCES = lmc.c
 OBJECTS = $(SOURCES:.c=.o)
@@ -10,6 +10,7 @@ OBJECTS = $(SOURCES:.c=.o)
 all: $(OUTPUT)
 
 $(OUTPUT): $(OBJECTS)
+	mkdir -p bin
 	$(CC) $^ $(LDFLAGS) -o $@
 
 %.o: %.c

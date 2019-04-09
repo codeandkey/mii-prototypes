@@ -1,0 +1,25 @@
+# lmc bash init
+# overrides the 'command not found' handler to automatically search for modules
+
+LMC_PREFIX="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../../../
+
+export PATH=${LMC_PREFIX}/bin:$PATH
+
+command_not_found_handle() {
+    res="$(lmc search $1)"
+    lines=$(echo "$res" | wc -l)
+    if [ -n "$res" ]; then
+        if [ $lines -eq 1 ]; then
+            mod=$(echo "$res" | cut -d'"' -f4)
+            echo "[lmc] autoloading $mod.."
+            module load $mod
+            export PATH
+            $@
+        else
+            echo "found multiple modules:"
+            echo "$res"
+        fi
+    else
+        echo "$1: command not found, no modules found"
+    fi
+}
