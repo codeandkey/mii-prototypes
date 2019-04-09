@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
 
         if (db_end_transaction()) return -1;
         clock_t end = clock();
-        fprintf(stderr, "[lmc] cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
+        fprintf(stderr, "lmc: cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
     } else if (!strcmp(subcommand, "search")) {
         if (++optind >= argc) {
             db_free();
