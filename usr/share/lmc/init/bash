@@ -4,6 +4,7 @@
 LMC_PREFIX="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../../../
 
 export PATH=${LMC_PREFIX}/bin:$PATH
+lmc build
 
 command_not_found_handle() {
     res="$(lmc search $1)"
@@ -12,12 +13,30 @@ command_not_found_handle() {
         if [ $lines -eq 1 ]; then
             mod=$(echo "$res" | cut -d'"' -f4)
             echo "[lmc] autoloading $mod.."
-            module load $mod
-            export PATH
-            $@
+            module load $mod && $@
         else
-            echo "found multiple modules:"
-            echo "$res"
+            echo "[lmc] select a module to load:"
+            num=0
+            while read -r line; do
+                mod_root=$(echo $line | cut -d'"' -f2)
+                mod_code=$(echo $line | cut -d'"' -f4)
+
+                num=$((num + 1))
+                printf "\t%d) %s\n" $num "$mod_code"
+            done <<< "$res"
+            printf "[lmc] enter a selection (1-%d, q to abort) [1]: " $num
+            read -r inp
+            [ ! -n "$inp" ] && inp=1
+            if [ $inp -ge 1 ]; then
+                if [ $inp -lt $num ]; then
+                    mod=$(echo "$res" | head -n $inp | tail -n1 | cut -d'"' -f4)
+                    echo "[lmc] loading $mod.."
+                    module load $mod && $@
+                    exit $?
+                fi
+            fi
+
+            echo "[lmc] cancelling.."
         fi
     else
         echo "$1: command not found, no modules found"
