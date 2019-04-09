@@ -7,6 +7,11 @@ LMC_PREFIX=$(dirname ${0:a})/../../../../
 export PATH=${LMC_PREFIX}/bin:$PATH
 lmc build
 
+if ! type module 2>&1 >/dev/null; then
+    echo "[lmc] module command not defined, will not autoload modules"
+    return
+fi
+
 command_not_found_handler() {
     res="$(lmc search "$1")"
     lines=$(echo "$res" | wc -l)
