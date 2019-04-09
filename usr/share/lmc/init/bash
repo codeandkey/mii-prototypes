@@ -28,7 +28,7 @@ command_not_found_handle() {
             read -r inp
             [ ! -n "$inp" ] && inp=1
             if [ $inp -ge 1 ]; then
-                if [ $inp -lt $num ]; then
+                if [ $inp -le $num ]; then
                     mod=$(echo "$res" | head -n $inp | tail -n1 | cut -d'"' -f4)
                     echo "[lmc] loading $mod.."
                     module load $mod && $@
