@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
     }
 
     if (!strcmp(subcommand, "help")) {
+        fprintf(stderr, "lmc: lightweight module cache\n\n");
         usage(*argv);
         return 0;
     } else if (!strcmp(subcommand, "build")) {
@@ -182,8 +183,12 @@ int main(int argc, char** argv) {
         }
 
         search_result_free(&res);
+    } else {
+        db_free();
+        fprintf(stderr, "error: invalid subcommand %s\n", subcommand);
+        usage(*argv);
+        return -1;
     }
-
 
     db_free();
     if (verbose) fprintf(stderr, "Bye\n");
@@ -763,6 +768,12 @@ void search_result_free(search_result* list) {
  * a0: argv[0]
  */
 void usage(char* a0) {
-    /* TODO: write this */
-    fprintf(stderr, "usage: %s [OPTIONS] <SUBCOMMAND>\n", a0);
+    fprintf(stderr, "usage: %s [OPTIONS] <SUBCOMMAND>\n\n", a0);
+    fprintf(stderr, "SUBCOMMAND:\n");
+    fprintf(stderr, "\t%-16sshow this message\n", "help");
+    fprintf(stderr, "\t%-16srebuild module cache\n", "build");
+    fprintf(stderr, "\t%-16ssearch for binary providers\n\n", "search <name>");
+    fprintf(stderr, "OPTIONS:\n");
+    fprintf(stderr, "\t%-16sdata directory (default: ~/.cache/lmc)\n", "-d <path>");
+    fprintf(stderr, "\t%-16smodule path string (default: $MODULEPATH)\n", "-m <path>");
 }
