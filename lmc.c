@@ -466,6 +466,7 @@ int build_root(char* root) {
         free(abs_path);
     }
 
+    closedir(d);
     return 0;
 }
 
@@ -509,6 +510,7 @@ int build_module_dir(char* root, char* module_dir, char* name) {
         free(abs_path);
     }
 
+    closedir(d);
     return 0;
 }
 
@@ -611,6 +613,7 @@ int build_potential_path(char* root, char* code, char* path) {
         free(abs_path);
     }
 
+    closedir(d);
     return 0;
 }
 
