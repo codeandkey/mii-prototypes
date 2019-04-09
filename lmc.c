@@ -20,27 +20,43 @@
 
 #include <sqlite3.h>
 
+/* string list type */
+typedef struct {
+    char** list;
+    int len;
+} string_list;
+
 /* compile-time constants */
 #define HOME_DATA_SUFFIX ".cache/lmc"
 
 /* options / paths */
-static char* data_dir; /* default: $HOME/.cache/lmc or /tmp/lmc.XXXX if HOME is not set */
+static char* data_dir;    /* default: $HOME/.cache/lmc or /tmp/lmc.XXXX if HOME is not set */
+static char* module_path; /* default: $MODULEPATH */
 
 /* globals */
-static sqlite3* db_connection;
+static sqlite3*    db_connection;
+static string_list module_roots;
 
 /* db functions */
 int  db_init();
 void db_free();
 int  db_flush_binaries();
 
+/* crawling functions */
+int build_root(char* root);
+
 /* util functions */
-int   path_init(char* user_path);  /* initialize data paths */
-int   path_try(char* path);        /* verify a path can be used as a directory */
-char* join_path(char* a, char* b); /* join two paths */
+int   init_datapath(char* user_path);   /* initialize data paths */
+void  init_modulepath(char* user_path); /* initialize module paths */
+int   path_try(char* path);             /* verify a path can be used as a directory */
+char* join_path(char* a, char* b);      /* join two paths */
+
+/* string_list functions */
+void string_list_append(string_list* l, char* item);
+void string_list_free(string_list* l);
 
 /*
- * main(argc, argv)
+ * main(...)
  *
  * program entry point
  */
@@ -48,12 +64,14 @@ int main(int argc, char** argv) {
     /* seed prng */
     srand(time(NULL));
 
-    if (path_init((argc > 1) ? argv[1] : NULL)) {
+    if (init_datapath(NULL)) {
         fprintf(stderr, "error: couldn't initialize any valid data directories!\n");
         return EXIT_FAILURE;
     }
 
     fprintf(stderr, "note: proceeding with verified data directory %s\n", data_dir);
+
+    init_modulepath(NULL);
 
     if (db_init()) {
         return -1;
@@ -125,17 +143,19 @@ int db_flush_binaries() {
 }
 
 /*
- * path_init(user_path)
+ * init_datapath(user_path)
  *
  * tries to initialize the lmc data directory
  * returns nonzero if no valid path could be initialized
+ *
+ * user_path: NULL or path to prefer over $HOME/.cache/lmc
  *
  * precedence:
  *   user_path
  *   $HOME/.cache/lmc
  *   /tmp/lmcXXXX
  */
-int path_init(char* user_path) {
+int init_datapath(char* user_path) {
     char* home_env = getenv("HOME");
 
     if (user_path && !path_try(user_path)) {
@@ -162,10 +182,44 @@ int path_init(char* user_path) {
 }
 
 /*
+ * init_modulepath(user_path)
+ *
+ * initialize and verify module paths
+ *
+ * user_path: MODULEPATH override
+ */
+void init_modulepath(char* user_path) {
+    char* cur_path, *tmp_module_path;
+
+    if (user_path) {
+        module_path = user_path;
+    } else {
+        if (!(module_path = getenv("MODULEPATH"))) {
+            fprintf(stderr, "warning: MODULEPATH not set\n");
+            module_path = "";
+        }
+    }
+
+    if (!strlen(module_path)) {
+        fprintf(stderr, "warning: no module paths, will not be able to find modules\n");
+        return;
+    }
+
+    tmp_module_path = strdup(module_path);
+    for (cur_path = strtok(tmp_module_path, ":"); cur_path; cur_path = strtok(NULL, ":")) {
+        string_list_append(&module_roots, cur_path);
+        fprintf(stderr, "note: using module root %s\n", cur_path);
+    }
+    free(tmp_module_path);
+}
+
+/*
  * path_try(path)
  *
  * verifies that a path can be used as a directory by lmc
  * will try and create it if it does not exist
+ *
+ * path: path to test
  *
  * returns nonzero if the path cannot be used
  */
@@ -200,6 +254,9 @@ int path_try(char* path) {
  * joins a and b together. there is no escaping or safety checks
  * returns a dynamically allocated string with the joined path
  *
+ * a: first path
+ * b: second path
+ *
  * the result should be passed to free() after use
  */
 char* join_path(char* a, char* b) {
@@ -207,4 +264,48 @@ char* join_path(char* a, char* b) {
     char* out = malloc(outsize);
     snprintf(out, outsize, "%s/%s", a, b);
     return out;
+}
+
+/*
+ * string_list_append(list, item)
+ *
+ * appends a string to a list
+ * the string is copied and seperately allocated before it is pushed on the list
+ *
+ * list: the list to append to
+ * item: the item to append
+ */
+void string_list_append(string_list* l, char* item) {
+    l->len++;
+    l->list = realloc(l->list, l->len * sizeof(char*));
+    l->list[l->len - 1] = item;
+}
+
+/*
+ * build_root(root)
+ * rebuilds the cache for a module root
+ *
+ * root: module root to build
+ *
+ * returns nonzero if something goes wrong
+ */
+int build_root(char* root) {
+    /*
+     * first, we must remove any binary entries from this root.
+     * this can be done with a single prepared statement.
+     */
+
+    return 0;
+}
+
+/*
+ * string_list_free(list)
+ *
+ * frees all elements and the list itself
+ *
+ * list: the list to free
+ */
+void string_list_free(string_list* l) {
+    while (l->len) free(l->list[--l->len]);
+    free(l->list);
 }
