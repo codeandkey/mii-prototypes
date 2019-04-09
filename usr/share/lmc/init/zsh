@@ -8,7 +8,6 @@ export PATH=${LMC_PREFIX}/bin:$PATH
 lmc build
 
 command_not_found_handler() {
-    echo "handler called, $@"
     res="$(lmc search $1)"
     lines=$(echo "$res" | wc -l)
     if [ -n "$res" ]; then
