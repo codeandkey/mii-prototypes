@@ -45,6 +45,7 @@ static int   verbose;
 /* globals */
 static sqlite3*    db_connection;
 static string_list module_roots;
+static int         module_count;
 
 /* prepared statements */
 static const char* stmt_src_add_bin = "insert into binaries values (?, ?, ?)";
@@ -154,13 +155,19 @@ int main(int argc, char** argv) {
         usage(*argv);
         return 0;
     } else if (!strcmp(subcommand, "build")) {
-        if (db_flush_binaries()) return -1;
+        module_count = 0;
+        clock_t begin = clock();
 
         if (db_begin_transaction()) return -1;
+        if (db_flush_binaries()) return -1;
+
         for (int i = 0; i < module_roots.len; ++i) {
             build_root(module_roots.list[i]);
         }
+
         if (db_end_transaction()) return -1;
+        clock_t end = clock();
+        fprintf(stderr, "[lmc] cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
     } else if (!strcmp(subcommand, "search")) {
         if (++optind >= argc) {
             db_free();
@@ -604,6 +611,7 @@ int build_potential_path(char* root, char* code, char* path) {
                 continue;
             }
 
+            ++module_count;
             sqlite3_reset(stmt_add_bin);
             break;
         }
