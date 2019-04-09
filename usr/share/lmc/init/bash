@@ -1,3 +1,4 @@
+#!/bin/env bash
 # lmc bash init
 # overrides the 'command not found' handler to automatically search for modules
 

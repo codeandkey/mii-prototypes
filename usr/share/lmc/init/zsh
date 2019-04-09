@@ -1,3 +1,4 @@
+#!/bin/env zsh
 # lmc zsh init
 # overrides the 'command not found' handler to automatically search for modules
 
