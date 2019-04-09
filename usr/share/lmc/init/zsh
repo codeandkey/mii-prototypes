@@ -3,7 +3,6 @@
 # overrides the 'command not found' handler to automatically search for modules
 
 LMC_PREFIX=$(dirname ${0:a})/../../../../
-echo $LMC_PREFIX
 
 export PATH=${LMC_PREFIX}/bin:$PATH
 lmc build
