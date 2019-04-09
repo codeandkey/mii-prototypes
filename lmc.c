@@ -660,7 +660,8 @@ int extract_lmod(char* path, string_list* list) {
  * bin: command to search for
  */
 search_result search_binary(char* bin) {
-    search_result out = {0};
+    search_result out;
+    memset(&out, 0, sizeof out);
     int res;
 
     if (sqlite3_bind_text(stmt_search_bin_exact, 1, bin, strlen(bin), SQLITE_TRANSIENT)) {
