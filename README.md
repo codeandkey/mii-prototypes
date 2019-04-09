@@ -42,7 +42,7 @@ Usage:   ace2sam [-pc] <in.ace>
 
 ### installation
 
-- Clone the repository: `git clone https://github.com/molecuul/lmc a~/.lmc"
+- Clone the repository: `git clone https://github.com/molecuul/lmc a~/.lmc"`
 - Build the source: `cd ~/.lmc && make`
 - `bash` users: `echo "source ~/.lmc/usr/share/lmc/init/bash" >> ~/.bashrc`
 - `zsh` users: `echo "source ~/.lmc/usr/share/lmc/init/zsh" >> ~/.zshrc`
