@@ -154,8 +154,6 @@ int main(int argc, char** argv) {
         usage(*argv);
         return 0;
     } else if (!strcmp(subcommand, "build")) {
-        printf("Building cache..\n");
-
         if (db_flush_binaries()) return -1;
 
         if (db_begin_transaction()) return -1;
@@ -444,7 +442,7 @@ int build_root(char* root) {
 
     /* try and walk the root */
     if (!(d = opendir(root))) {
-        fprintf(stderr, "warning: couldn't open module root %s: %m\n", root);
+        if (verbose) fprintf(stderr, "warning: couldn't open module root %s: %m\n", root);
         return -1;
     }
 
