@@ -570,7 +570,7 @@ int build_potential_path(char* root, char* code, char* path) {
 
     /* try and walk the dir */
     if (!(d = opendir(path))) {
-        fprintf(stderr, "warning: couldn't open potential path %s (from %s): %m\n", path, code);
+        if (verbose) fprintf(stderr, "warning: couldn't open potential path %s (from %s): %m\n", path, code);
         return -1;
     }
 
