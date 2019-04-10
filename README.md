@@ -34,6 +34,15 @@ lmc will prompt you if multiple modules can provide your command:
 Usage:   ace2sam [-pc] <in.ace>
 ~~~
 
+lmc will help you remember commands as well:
+~~~
+[molecuul@pine ~] iseg
+iseg: command not found
+[lmc] hint: try a similar command "iSeg_py" "iSeg_csv2xlsx.py" "iSeg"
+[molecuul@pine ~] iSeg
+[lmc] autoloading iseg/1.3.0-oqdecre..
+~~~
+
 ### features
 
 - Streamlined module environment
