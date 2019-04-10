@@ -42,6 +42,7 @@ typedef struct {
 static char* data_dir;    /* default: $HOME/.cache/lmc or /tmp/lmc.XXXX if HOME is not set */
 static char* module_path; /* default: $MODULEPATH */
 static int   verbose;
+static int   datapath_should_free;
 
 /* globals */
 static sqlite3*    db_connection;
@@ -88,7 +89,10 @@ search_result search_similar(char* bin);
 /* util functions */
 int   init_regex();                     /* initialize regular expressions */
 int   init_datapath(char* user_path);   /* initialize data paths */
+void  free_datapath();                  /* free data paths */
 void  init_modulepath(char* user_path); /* initialize module paths */
+void  free_modulepath();                /* free module paths */
+void  free_regex();                     /* free compiled regular expressions */
 int   path_try(char* path);             /* verify a path can be used as a directory */
 char* join_path(char* a, char* b);      /* join two paths */
 char* expand_string(char* str);         /* expand string with environment substitutions */
@@ -149,10 +153,6 @@ int main(int argc, char** argv) {
 
     init_modulepath(user_modulepath);
 
-    if (init_regex()) {
-        return EXIT_FAILURE;
-    }
-
     if (db_init()) {
         return EXIT_FAILURE;
     }
@@ -162,6 +162,12 @@ int main(int argc, char** argv) {
         usage(*argv);
         return 0;
     } else if (!strcmp(subcommand, "build")) {
+        /* regexes are only used in the build process,
+         * so we compile and free them in this subcommand */
+        if (init_regex()) {
+            return EXIT_FAILURE;
+        }
+
         module_count = 0;
         clock_t begin = clock();
 
@@ -175,6 +181,7 @@ int main(int argc, char** argv) {
         if (db_end_transaction()) return -1;
         clock_t end = clock();
         fprintf(stderr, "lmc: cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
+        free_regex();
     } else if (!strcmp(subcommand, "search")) {
         if (++optind >= argc) {
             db_free();
@@ -210,6 +217,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    free_datapath();
+    free_modulepath();
     db_free();
     if (verbose) fprintf(stderr, "Bye\n");
     return 0;
@@ -268,6 +277,11 @@ int db_init() {
  * terminates the database connection
  */
 void db_free() {
+    /* free prepared statements */
+    sqlite3_finalize(stmt_add_bin);
+    sqlite3_finalize(stmt_search_bin_exact);
+
+    /* close connection */
     sqlite3_close(db_connection);
     db_connection = NULL;
 }
@@ -346,6 +360,8 @@ int init_datapath(char* user_path) {
         return 0;
     }
 
+    datapath_should_free = 1;
+
     if (home_env && strlen(home_env)) {
         char* home_data = join_path(home_env, HOME_DATA_SUFFIX);
 
@@ -362,6 +378,16 @@ int init_datapath(char* user_path) {
     data_dir = malloc(13);
     snprintf(data_dir, 13, "/tmp/lmc%04x", rand());
     return path_try(data_dir);
+}
+
+/*
+ * free_datapath()
+ * frees the datapaths allocated by init_datapath() if necessary
+ *
+ * should be called at program end
+ */
+void free_datapath() {
+    if (datapath_should_free) free(data_dir);
 }
 
 /*
@@ -586,6 +612,7 @@ int build_module_file(char* root, char* module_name, char* module_file_name, cha
     }
 
     free(code);
+    string_list_free(&paths);
 
     return 0;
 }
@@ -767,6 +794,7 @@ int extract_tcl(char* path, string_list* list) {
 
             /* seems ok, add the value to the potential paths */
             string_list_append(list, val_exp);
+            free(val_exp);
             ++count;
         }
     }
@@ -958,4 +986,24 @@ char* expand_string(char* str) {
 
     wordfree(&exp);
     return final_val;
+}
+
+/*
+ * free_regex()
+ *
+ * frees compiled regular expressions
+ * should be called at end of program
+ */
+void free_regex() {
+    regfree(&reg_lmod);
+}
+
+/*
+ * free_modulepath()
+ * frees the module paths allocated by init_modulepath()
+ *
+ * should be called at program end
+ */
+void free_modulepath() {
+    string_list_free(&module_roots);
 }
