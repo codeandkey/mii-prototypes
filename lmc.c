@@ -57,7 +57,7 @@ static sqlite3_stmt* stmt_search_bin_exact;
 /* regular expressions */
 static const char* reg_src_lmod = "^[[:space:]]*(prepend_path|append_path)" \
                                   "[[:space:]]*\\([[:space:]]*\"PATH\"[[:space:]]*" \
-                                  ",[[:space:]]*\"([^\"]+)\"[[:space:]]*\\)[[:space:]]*$";
+                                  ",[[:space:]]*\"([^\"]+)\"[[:space:]]*(,[[:space:]]*\"[^\"]*)\"[[:space:]]*)?\\)[[:space:]]*$";
 
 static regex_t reg_lmod;
 
