@@ -280,6 +280,7 @@ void db_free() {
     /* free prepared statements */
     sqlite3_finalize(stmt_add_bin);
     sqlite3_finalize(stmt_search_bin_exact);
+    sqlite3_finalize(stmt_search_bin_similar);
 
     /* close connection */
     sqlite3_close(db_connection);
