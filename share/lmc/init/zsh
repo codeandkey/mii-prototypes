@@ -5,6 +5,12 @@
 LMC_PREFIX=$(dirname ${0:a})/../../../
 
 export PATH=${LMC_PREFIX}/bin:$PATH
+
+if ! type lmc 2>&1 >/dev/null; then
+    echo "[lmc] couldn't find lmc binary, please check it is built"
+    return
+fi
+
 lmc build
 
 if ! type module 2>&1 >/dev/null; then
