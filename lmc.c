@@ -223,6 +223,13 @@ int db_init() {
         return -1;
     }
 
+    /* performance boost: enable asynchronous writing */
+    if (sqlite3_exec(db_connection, "PRAGMA synchronous = off",
+                     NULL, NULL, &sql_error)) {
+        fprintf(stderr, "warning: failed to enable asynchronous database writing: %s\n", sql_error);
+        return -1;
+    }
+
     /* create prepared statements */
     if (sqlite3_prepare_v2(db_connection, stmt_src_add_bin, strlen(stmt_src_add_bin), &stmt_add_bin, NULL)) {
         fprintf(stderr, "error: failed to initialize add_bin statement: %s\n", sqlite3_errmsg(db_connection));
