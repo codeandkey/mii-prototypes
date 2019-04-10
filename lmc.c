@@ -891,6 +891,5 @@ char* expand_string(char* str) {
     }
 
     wordfree(&exp);
-    fprintf(stderr, "DEBUG: expanded %s into %s\n", str, final_val);
     return final_val;
 }
