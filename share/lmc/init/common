@@ -24,7 +24,7 @@ lines=$(echo "$res" | wc -l)
 if [ -n "$res" ]; then
     if [ $lines -eq 1 ]; then
         mod=$(echo "$res" | cut -d'"' -f4)
-        printf "[lmc] ${col_green}autoloading $mod..${col_reset}" >&2
+        printf "[lmc] ${col_green}autoloading $mod..${col_reset}\n" >&2
         module load "$mod" && $@
     else
         printf "[lmc] ${col_cyan}select a module to load:${col_reset}\n" >&2
