@@ -2,7 +2,8 @@
 # lmc zsh init
 # overrides the 'command not found' handler to automatically search for modules
 
-LMC_PREFIX=$(dirname ${0:a})/../../../
+SRC_DIR=$(dirname ${0:a})
+LMC_PREFIX=${SRC_DIR}/../../../
 
 export PATH=${LMC_PREFIX}/bin:$PATH
 
@@ -19,53 +20,8 @@ if ! type module 2>&1 >/dev/null; then
 fi
 
 command_not_found_handler() {
-    res="$(lmc search "$1")"
-    lines=$(echo "$res" | wc -l)
-    if [ -n "$res" ]; then
-        if [ $lines -eq 1 ]; then
-            mod=$(echo "$res" | cut -d'"' -f4)
-            echo "[lmc] autoloading $mod.." >&2
-            module load "$mod" && $@
-        else
-            echo "[lmc] select a module to load:" >&2
-            num=0
-            while read -r line; do
-                mod_code=$(echo $line | cut -d'"' -f4)
+    # force bash-compatible word splitting
+    setopt shwordsplit
 
-                num=$((num + 1))
-                printf "\t%d) %s\n" $num "$mod_code" >&2
-            done <<< "$res"
-            printf "[lmc] enter a selection (1-%d, q to abort) [1]: " $num >&2
-            read -r inp
-            [ -z "$inp" ] && inp=1
-            if [ $inp -ge 1 ]; then
-                if [ $inp -le $num ]; then
-                    mod=$(echo "$res" | head -n $inp | tail -n1 | cut -d'"' -f4)
-                    echo "[lmc] loading $mod.." >&2
-                    module load "$mod" && $@
-                    exit $?
-                fi
-            fi
-
-            echo "[lmc] cancelling.." >&2
-        fi
-    else
-        echo "$1: command not found" >&2
-
-        # try and find similar commands
-        res="$(lmc like "$1" | cut -d'"' -f6 | uniq | head -n3 | paste -sd' ' -)"
-
-        if [ -n "$res" ]; then
-            printf "[lmc] hint: try a similar command" >&2
-
-            # force bash-compatible word splitting
-            setopt shwordsplit
-            for i in $res; do
-                printf " \"%s\"" "$i" >&2
-            done
-            echo >&2
-        else
-            echo "[lmc] no similar binaries found" >&2
-        fi
-    fi
+    ${SRC_DIR}/common $@
 }
