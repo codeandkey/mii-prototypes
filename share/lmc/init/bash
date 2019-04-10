@@ -50,6 +50,19 @@ command_not_found_handle() {
             echo "[lmc] cancelling.." >&2
         fi
     else
-        echo "$1: command not found, no modules found" >&2
+        echo "$1: command not found" >&2
+
+        # try and find similar commands
+        res="$(lmc like "$1" | cut -d'"' -f6 | uniq | head -n3 | paste -sd' ' -)"
+
+        if [ -n "$res" ]; then
+            printf "[lmc] hint: try a similar command" >&2
+            for i in $res; do
+                printf " \"%s\"" "$i" >&2
+            done
+            echo >&2
+        else
+            echo "[lmc] no similar binaries found" >&2
+        fi
     fi
 }

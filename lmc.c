@@ -51,9 +51,11 @@ static int         module_count;
 /* prepared statements */
 static const char* stmt_src_add_bin = "insert into binaries values (?, ?, ?)";
 static const char* stmt_src_search_bin_exact = "select * from binaries where bin=?";
+static const char* stmt_src_search_bin_similar = "select * from binaries where bin like ?";
 
 static sqlite3_stmt* stmt_add_bin;
 static sqlite3_stmt* stmt_search_bin_exact;
+static sqlite3_stmt* stmt_search_bin_similar;
 
 /* regular expressions */
 static const char* reg_src_lmod = "^[[:space:]]*(prepend_path|append_path)" \
@@ -81,6 +83,7 @@ int extract_tcl(char* path, string_list* list);
 
 /* searching functions */
 search_result search_binary(char* bin);
+search_result search_similar(char* bin);
 
 /* util functions */
 int   init_regex();                     /* initialize regular expressions */
@@ -186,6 +189,20 @@ int main(int argc, char** argv) {
         }
 
         search_result_free(&res);
+    } else if (!strcmp(subcommand, "like")) {
+        if (++optind >= argc) {
+            db_free();
+            usage(*argv);
+            return -1;
+        }
+
+        search_result res = search_similar(argv[optind]);
+
+        for (int i = 0; i < res.bins.len; ++i) {
+            printf("=> root=\"%s\", code=\"%s\", bin=\"%s\"\n", res.roots.list[i], res.codes.list[i], res.bins.list[i]);
+        }
+
+        search_result_free(&res);
     } else {
         db_free();
         fprintf(stderr, "error: invalid subcommand %s\n", subcommand);
@@ -227,13 +244,18 @@ int db_init() {
     }
 
     /* create prepared statements */
-    if (sqlite3_prepare_v2(db_connection, stmt_src_add_bin, strlen(stmt_src_add_bin), &stmt_add_bin, NULL)) {
+    if (sqlite3_prepare_v2(db_connection, stmt_src_add_bin, -1, &stmt_add_bin, NULL)) {
         fprintf(stderr, "error: failed to initialize add_bin statement: %s\n", sqlite3_errmsg(db_connection));
         return -1;
     }
 
-    if (sqlite3_prepare_v2(db_connection, stmt_src_search_bin_exact, strlen(stmt_src_search_bin_exact), &stmt_search_bin_exact, NULL)) {
+    if (sqlite3_prepare_v2(db_connection, stmt_src_search_bin_exact, -1, &stmt_search_bin_exact, NULL)) {
         fprintf(stderr, "error: failed to initialize search_bin_exact statement: %s\n", sqlite3_errmsg(db_connection));
+        return -1;
+    }
+
+    if (sqlite3_prepare_v2(db_connection, stmt_src_search_bin_similar, -1, &stmt_search_bin_similar, NULL)) {
+        fprintf(stderr, "error: failed to initialize search_bin_similar statement: %s\n", sqlite3_errmsg(db_connection));
         return -1;
     }
 
@@ -791,6 +813,49 @@ search_result search_binary(char* bin) {
 }
 
 /*
+ * search_similar(bin)
+ * searches the database for similar binary entries
+ *
+ * bin: command to search for
+ */
+search_result search_similar(char* bin) {
+    search_result out;
+    memset(&out, 0, sizeof out);
+    int res;
+
+    /* we need to add a '%' to the beginning and end of 'bin' to allow wildcard matching in SQL LIKE */
+    int bin_len = strlen(bin);
+    char* bin_param = malloc(bin_len + 3);
+    snprintf(bin_param, bin_len + 3, "%%%s%%", bin);
+
+    if (sqlite3_bind_text(stmt_search_bin_similar, 1, bin_param, -1, SQLITE_TRANSIENT)) {
+        fprintf(stderr, "error: failed to bind parameter to search_bin_exact: %s\n", sqlite3_errmsg(db_connection));
+        return out;
+    }
+
+    free(bin_param);
+
+    while (1) {
+        res = sqlite3_step(stmt_search_bin_similar);
+
+        if (res == SQLITE_ROW) {
+            char* root = (char*) sqlite3_column_text(stmt_search_bin_similar, 0);
+            char* code = (char*) sqlite3_column_text(stmt_search_bin_similar, 1);
+            char* bin = (char*) sqlite3_column_text(stmt_search_bin_similar, 2);
+
+            search_result_append(&out, root, code, bin);
+        }
+
+        if (res == SQLITE_DONE) {
+            break;
+        }
+    }
+
+    sqlite3_reset(stmt_search_bin_similar);
+    return out;
+}
+
+/*
  * init_regex()
  * initializes regular expressions
  *
@@ -860,7 +925,8 @@ void usage(char* a0) {
     fprintf(stderr, "SUBCOMMAND:\n");
     fprintf(stderr, "\t%-16sshow this message\n", "help");
     fprintf(stderr, "\t%-16srebuild module cache\n", "build");
-    fprintf(stderr, "\t%-16ssearch for binary providers\n\n", "search <name>");
+    fprintf(stderr, "\t%-16ssearch for exact providers\n", "search <name>");
+    fprintf(stderr, "\t%-16ssearch for similar providers\n\n", "like <name>");
     fprintf(stderr, "OPTIONS:\n");
     fprintf(stderr, "\t%-16sdata directory (default: ~/.cache/lmc)\n", "-d <path>");
     fprintf(stderr, "\t%-16smodule path string (default: $MODULEPATH)\n", "-m <path>");
