@@ -39,7 +39,8 @@ Usage:   ace2sam [-pc] <in.ace>
 - Streamlined module environment
 - Blazing speed (caches ~70,000 binary entries / second on my machine)
 - Lightweight source, few dependencies
-- Lmod module support
+- [Lmod](https://lmod.readthedocs.io/en/latest/) module support
+- [Tcl](https://modules.readthedocs.io/en/latest/) module support
 
 ### installation
 
