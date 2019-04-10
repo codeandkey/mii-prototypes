@@ -1,8 +1,8 @@
-#!/bin/env zsh
-# lmc zsh init
+#!/bin/env bash
+# lmc bash init
 # overrides the 'command not found' handler to automatically search for modules
 
-LMC_PREFIX=$(dirname ${0:a})/../../../../
+LMC_PREFIX="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../../
 
 export PATH=${LMC_PREFIX}/bin:$PATH
 lmc build
@@ -12,7 +12,7 @@ if ! type module 2>&1 >/dev/null; then
     return
 fi
 
-command_not_found_handler() {
+command_not_found_handle() {
     res="$(lmc search "$1")"
     lines=$(echo "$res" | wc -l)
     if [ -n "$res" ]; then
