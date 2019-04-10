@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <regex.h>
+#include <wordexp.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -76,6 +77,7 @@ int build_potential_path(char* root, char* code, char* path);
 
 /* parsing functions */
 int extract_lmod(char* path, string_list* list);
+int extract_tcl(char* path, string_list* list);
 
 /* searching functions */
 search_result search_binary(char* bin);
@@ -86,6 +88,7 @@ int   init_datapath(char* user_path);   /* initialize data paths */
 void  init_modulepath(char* user_path); /* initialize module paths */
 int   path_try(char* path);             /* verify a path can be used as a directory */
 char* join_path(char* a, char* b);      /* join two paths */
+char* expand_string(char* str);         /* expand string with environment substitutions */
 void  usage(char* a0);                  /* print usage info */
 
 /* string_list functions */
@@ -549,7 +552,10 @@ int build_module_file(char* root, char* module_name, char* module_file_name, cha
     string_list paths = {0};
 
     if (verbose) fprintf(stderr, "note: building %s from %s\n", code, module_file_path);
-    extract_lmod(module_file_path, &paths);
+
+    if (extract_tcl(module_file_path, &paths)) {
+        extract_lmod(module_file_path, &paths);
+    }
 
     if (verbose) fprintf(stderr, "note: searching %d potential paths for %s\n", paths.len, code);
     
@@ -668,6 +674,88 @@ int extract_lmod(char* path, string_list* list) {
 }
 
 /*
+ * extract_tcl(path, list)
+ * extracts additonal PATH variables from Tcl modulefiles
+ *
+ * path: path to module file
+ * list: destination string list
+ */
+int extract_tcl(char* path, string_list* list) {
+    FILE* f;
+    char linebuf[LINEBUF_SIZE];
+    int count;
+
+    if (!(f = fopen(path, "r"))) { 
+        fprintf(stderr, "warning: couldn't open %s for reading: %m\n", path);
+        return -1;
+    }
+
+    /* test that the first line contains the magic Tcl cookie */
+    if (!fgets(linebuf, sizeof linebuf, f)) {
+        fclose(f);
+        return -1;
+    }
+
+    if (strncmp(linebuf, "#%Module", 8)) {
+        fclose(f);
+        return -1;
+    }
+
+    count = 0;
+    while (fgets(linebuf, sizeof linebuf, f)) {
+        if (*linebuf == '\n') continue;
+        if (*linebuf == '#') continue;
+
+        /* get command */
+        char* cmd = strtok(linebuf, " \t");
+        if (!cmd) continue;
+
+        /* 'set' command, add a pair to the environment */
+        if (!strcmp(cmd, "set")) {
+            char* key = strtok(NULL, " \t");
+            if (!key) continue;
+            char* val = strtok(NULL, "\n");
+            if (!val) continue;
+
+            char* val_exp = expand_string(val);
+            if (!val_exp) continue;
+
+            /* 
+             * we can just use our program environment to store variables.
+             * this makes POSIX wordexp() incredibly useful here
+             *
+             * TODO: this might be better done differently, not sure why though
+             */
+            setenv(key, val_exp, 1);
+            free(val_exp);
+        }
+
+        /* 'prepend-path' and 'append-path' */
+        if (!strcmp(cmd, "prepend-path") || !strcmp(cmd, "append-path")) {
+            char* key = strtok(NULL, " \t");
+            if (!key || strcmp(key, "PATH")) continue;
+            char* val = strtok(NULL, "\n");
+            if (!val) continue;
+
+            char* val_exp = expand_string(val);
+            if (!val_exp) {
+                if (verbose) fprintf(stderr, "warning: expansion failed in %s value: %s\n", cmd, val);
+                continue;
+            }
+
+            /* seems ok, add the value to the potential paths */
+            string_list_append(list, val_exp);
+            ++count;
+        }
+    }
+
+    fclose(f);
+
+    if (verbose) fprintf(stderr, "note: extract_tcl() pulled %d paths from %s\n", count, path);
+    return 0;
+}
+
+/*
  * search_binary(bin)
  * searches the database for providers for a binary
  *
@@ -776,4 +864,32 @@ void usage(char* a0) {
     fprintf(stderr, "OPTIONS:\n");
     fprintf(stderr, "\t%-16sdata directory (default: ~/.cache/lmc)\n", "-d <path>");
     fprintf(stderr, "\t%-16smodule path string (default: $MODULEPATH)\n", "-m <path>");
+}
+
+/*
+ * expand_string(str)
+ * performs string expansion and environment substitution
+ *
+ * str: string to parse
+ *
+ * returns an allocated string value or NULL if an error occurs
+ */
+char* expand_string(char* str) {
+    wordexp_t exp;
+    if (wordexp(str, &exp, 0)) {
+        return NULL;
+    }
+
+    char* final_val = NULL;
+    int final_len = 0;
+    for (int i = 0; i < exp.we_wordc; ++i) {
+        int wlen = strlen(exp.we_wordv[i]);
+        final_val = realloc(final_val, final_len + wlen + 1);
+        strncpy(final_val + final_len, exp.we_wordv[i], wlen);
+        final_len += wlen;
+        final_val[final_len] = 0;
+    }
+
+    wordfree(&exp);
+    return final_val;
 }
