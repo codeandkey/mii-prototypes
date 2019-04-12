@@ -53,8 +53,9 @@ iseg: command not found
 
 ### installation
 
+- It is not technically _required_, but you should have Lmod or Environment Modules installed
 - Ensure you have the SQLite headers and libraries (Arch: `sqlite`, Ubuntu, Debian: `libsqlite3-dev`)
 - Clone the repository: `git clone https://github.com/molecuul/lmc ~/.lmc"`
 - Build the source: `cd ~/.lmc && make`
-- `bash` users: `echo "source ~/.lmc/usr/share/lmc/init/bash" >> ~/.bashrc`
-- `zsh` users: `echo "source ~/.lmc/usr/share/lmc/init/zsh" >> ~/.zshrc`
+- `bash` users: `echo "source ~/.lmc/share/lmc/init/bash" >> ~/.bashrc`
+- `zsh` users: `echo "source ~/.lmc/share/lmc/init/zsh" >> ~/.zshrc`
