@@ -4,6 +4,9 @@
  * lightweight module cache
  */
 
+/* enable POSIX extensions strdup() and setenv() */
+#define _BSD_SOURCE
+
 /* includes */
 #include <stdlib.h>
 #include <stdio.h>
@@ -521,7 +524,7 @@ int build_root(char* root) {
             continue;
         }
 
-        if ((st.st_mode & S_IFMT) == S_IFDIR) {
+        if (S_ISDIR(st.st_mode)) {
             build_module_dir(root, abs_path, dp->d_name);
         }
 
@@ -562,11 +565,8 @@ int build_module_dir(char* root, char* module_dir, char* name) {
             continue;
         }
 
-        switch (st.st_mode & S_IFMT) {
-        case S_IFREG:
-        case S_IFLNK:
+        if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) {
             build_module_file(root, name, dp->d_name, abs_path);
-            break;
         }
 
         free(abs_path);
@@ -649,9 +649,7 @@ int build_potential_path(char* root, char* code, char* path) {
             continue;
         }
 
-        switch (st.st_mode & S_IFMT) {
-        case S_IFREG:
-        case S_IFLNK:
+        if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) {
             /* check that we have execute permission */
             if (access(abs_path, X_OK)) continue;
 
@@ -674,7 +672,6 @@ int build_potential_path(char* root, char* code, char* path) {
 
             ++module_count;
             sqlite3_reset(stmt_add_bin);
-            break;
         }
 
         free(abs_path);

@@ -1,27 +1,26 @@
-#!/bin/env zsh
-# lmc zsh init
+#!/bin/env bash
+# lmc bash init
 # overrides the 'command not found' handler to automatically search for modules
 
-SRC_DIR=$(dirname ${0:a})
+SRC_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 LMC_PREFIX=${SRC_DIR}/../../../
+LMC_BIN=${LMC_PREFIX}/bin/lmc
 
-export PATH=${LMC_PREFIX}/bin:$PATH
+# need to export for common to use it
+export LMC_BIN
 
-if ! type lmc 2>&1 >/dev/null; then
+if [ ! -x "$LMC_BIN" ]; then
     echo "[lmc] couldn't find lmc binary, please check it is built"
     return
 fi
 
-lmc build
+$LMC_BIN build
 
 if ! type module 2>&1 >/dev/null; then
     echo "[lmc] module command not defined, will not autoload modules"
     return
 fi
 
-command_not_found_handler() {
-    # force bash-compatible word splitting
-    setopt shwordsplit
-
+command_not_found_handle() {
     ${SRC_DIR}/common $@
 }
