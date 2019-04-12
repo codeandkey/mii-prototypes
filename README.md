@@ -51,14 +51,13 @@ iseg: command not found
 - [Lmod](https://lmod.readthedocs.io/en/latest/) module support
 - [Tcl](https://modules.readthedocs.io/en/latest/) module support
 
-### installation
-
-Dependencies:
+### dependencies
 
 - Not technically _required_, but you should have Lmod or Environment Modules installed
 - SQLite headers and libraries (Arch: `sqlite`, Ubuntu, Debian: `libsqlite3-dev`)
 - CMake >=2.6
 
+### installation
 
 - Clone the repository: `git clone https://github.com/molecuul/lmc`
 - Generate the makefiles: `cd lmc; mkdir build; cd build; cmake ..`
