@@ -4,6 +4,9 @@
  * lightweight module cache
  */
 
+/* enable POSIX extensions strdup() and setenv() */
+#define _BSD_SOURCE
+
 /* includes */
 #include <stdlib.h>
 #include <stdio.h>
