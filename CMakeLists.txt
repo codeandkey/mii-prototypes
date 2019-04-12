@@ -9,4 +9,4 @@ find_package (SQLite3 REQUIRED)
 add_subdirectory (lmc)
 
 # install target for init scripts
-install (DIRECTORY init DESTINATION share/lmc)
+install (DIRECTORY init DESTINATION share/lmc USE_SOURCE_PERMISSIONS)
