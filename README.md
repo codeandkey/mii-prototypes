@@ -62,5 +62,5 @@ iseg: command not found
 - Clone the repository: `git clone https://github.com/molecuul/lmc`
 - Generate the makefiles: `cd lmc; mkdir build; cd build; cmake ..`
 - Build and install: `make && sudo make install`
-- `bash` users: `echo "source ~/usr/local/share/lmc/init/bash" >> ~/.bashrc`
-- `zsh` users: `echo "source ~/usr/local/share/lmc/init/zsh" >> ~/.zshrc`
+- `bash` users: `echo "source /usr/local/share/lmc/init/bash" >> ~/.bashrc`
+- `zsh` users: `echo "source /usr/local/share/lmc/init/zsh" >> ~/.zshrc`
