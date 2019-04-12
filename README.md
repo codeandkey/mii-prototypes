@@ -59,7 +59,7 @@ iseg: command not found
 
 ### installation
 
-- Clone the repository: `git clone https://github.com/molecuul/lmc`
+- Clone the repository: `git clone https://github.com/codeandkey/lmc`
 - Generate the makefiles: `cd lmc; mkdir build; cd build; cmake ..`
 - Build and install: `make && sudo make install`
 - `bash` users: `echo "source /usr/local/share/lmc/init/bash" >> ~/.bashrc`
