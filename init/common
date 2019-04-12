@@ -11,7 +11,7 @@ if [ -z "$LMC_NO_COLORS" ]; then
     col_white="\e[0;37;1m"
 fi
 
-res="$(lmc search "$1")"
+res="$($LMC_BIN search "$1")"
 lines=$(echo "$res" | wc -l)
 if [ -n "$res" ]; then
     if [ $lines -eq 1 ]; then
@@ -45,7 +45,7 @@ if [ -n "$res" ]; then
     printf "%s: ${col_red}command not found${col_reset}\n" "$1" >&2
 
     # try and find similar commands
-    res="$(lmc like "$1" | cut -d'"' -f6 | uniq | head -n3 | paste -sd' ' -)"
+    res="$($LMC_BIN like "$1" | cut -d'"' -f6 | uniq | head -n3 | paste -sd' ' -)"
 
     if [ -n "$res" ]; then
         printf "[lmc] ${col_cyan}hint: try a similar command${col_reset}" >&2

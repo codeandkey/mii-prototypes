@@ -4,15 +4,14 @@
 
 SRC_DIR=$(dirname ${0:a})
 LMC_PREFIX=${SRC_DIR}/../../../
+LMC_BIN=${LMC_PREFIX}/bin/lmc
 
-export PATH=${LMC_PREFIX}/bin:$PATH
-
-if ! type lmc 2>&1 >/dev/null; then
+if [ ! -x "$LMC_BIN" ]; then
     echo "[lmc] couldn't find lmc binary, please check it is built"
     return
 fi
 
-lmc build
+$LMC_BIN build
 
 if ! type module 2>&1 >/dev/null; then
     echo "[lmc] module command not defined, will not autoload modules"
