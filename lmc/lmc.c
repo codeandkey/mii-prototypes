@@ -6,6 +6,7 @@
 
 /* enable POSIX extensions strdup() and setenv() */
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 /* includes */
 #include <stdlib.h>
