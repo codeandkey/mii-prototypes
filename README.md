@@ -1,5 +1,6 @@
 # lmc
 [![Build Status](https://travis-ci.com/codeandkey/lmc.svg?branch=master)](https://travis-ci.com/codeandkey/lmc)
+
 lightweight module cache
 
 lmc automatically caches and loads environment modules for you. It works by hooking into your shells' "command not found" event and using that opportunity to see if any modules
