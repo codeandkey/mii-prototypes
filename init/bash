@@ -1,23 +1,23 @@
 #!/bin/env bash
-# lmc bash init
+# mii bash init
 # overrides the 'command not found' handler to automatically search for modules
 
 SRC_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-LMC_PREFIX=${SRC_DIR}/../../../
-LMC_BIN=${LMC_PREFIX}/bin/lmc
+MII_PREFIX=${SRC_DIR}/../../../
+MII_BIN=${MII_PREFIX}/bin/mii
 
 # need to export for common to use it
-export LMC_BIN
+export MII_BIN
 
-if [ ! -x "$LMC_BIN" ]; then
-    echo "[lmc] couldn't find lmc binary, please check it is built"
+if [ ! -x "$MII_BIN" ]; then
+    echo "[mii] couldn't find mii binary, please check it is built"
     return
 fi
 
-$LMC_BIN build
+$MII_BIN build
 
 if ! type module 2>&1 >/dev/null; then
-    echo "[lmc] module command not defined, will not autoload modules"
+    echo "[mii] module command not defined, will not autoload modules"
     return
 fi
 

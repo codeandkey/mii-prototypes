@@ -1,7 +1,8 @@
 /*
- * lmc.c
+ * mii.c
  *
- * lightweight module cache
+ * module inverted index
+ * indexing engine source
  */
 
 /* enable POSIX extensions strdup() and setenv() */
@@ -39,11 +40,11 @@ typedef struct {
 } search_result;
 
 /* compile-time constants */
-#define HOME_DATA_SUFFIX ".cache/lmc"
+#define HOME_DATA_SUFFIX ".cache/mii"
 #define LINEBUF_SIZE 512
 
 /* options / paths */
-static char* data_dir;    /* default: $HOME/.cache/lmc or /tmp/lmc.XXXX if HOME is not set */
+static char* data_dir;    /* default: $HOME/.cache/mii or /tmp/mii.XXXX if HOME is not set */
 static char* module_path; /* default: $MODULEPATH */
 static int   verbose;
 static int   datapath_should_free;
@@ -162,7 +163,7 @@ int main(int argc, char** argv) {
     }
 
     if (!strcmp(subcommand, "help")) {
-        fprintf(stderr, "lmc: lightweight module cache\n\n");
+        fprintf(stderr, "mii: module inverted index\n\n");
         usage(*argv);
         return 0;
     } else if (!strcmp(subcommand, "build")) {
@@ -184,7 +185,7 @@ int main(int argc, char** argv) {
 
         if (db_end_transaction()) return -1;
         clock_t end = clock();
-        fprintf(stderr, "lmc: cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
+        fprintf(stderr, "mii: cached %d modules in %.2f seconds\n", module_count, (float) (end - begin) / (float) CLOCKS_PER_SEC);
         free_regex();
     } else if (!strcmp(subcommand, "search")) {
         if (++optind >= argc) {
@@ -231,7 +232,7 @@ int main(int argc, char** argv) {
 /*
  * db_init()
  *
- * initializes the local database at "<cache_path>/lmc.db"
+ * initializes the local database at "<cache_path>/mii.db"
  * also creates the table structure for the cache if it does not exist
  * returns nonzero on failure
  */
@@ -239,7 +240,7 @@ int db_init() {
     char* db_path, *sql_error;
     int res;
 
-    db_path = join_path(data_dir, "lmc.db");
+    db_path = join_path(data_dir, "mii.db");
     res = sqlite3_open(db_path, &db_connection);
 
     free(db_path);
@@ -347,15 +348,15 @@ int db_flush_binaries() {
 /*
  * init_datapath(user_path)
  *
- * tries to initialize the lmc data directory
+ * tries to initialize the mii data directory
  * returns nonzero if no valid path could be initialized
  *
- * user_path: NULL or path to prefer over $HOME/.cache/lmc
+ * user_path: NULL or path to prefer over $HOME/.cache/mii
  *
  * precedence:
  *   user_path
- *   $HOME/.cache/lmc
- *   /tmp/lmcXXXX
+ *   $HOME/.cache/mii
+ *   /tmp/miiXXXX
  */
 int init_datapath(char* user_path) {
     char* home_env = getenv("HOME");
@@ -381,7 +382,7 @@ int init_datapath(char* user_path) {
     }
 
     data_dir = malloc(13);
-    snprintf(data_dir, 13, "/tmp/lmc%04x", rand());
+    snprintf(data_dir, 13, "/tmp/mii%04x", rand());
     return path_try(data_dir);
 }
 
@@ -430,7 +431,7 @@ void init_modulepath(char* user_path) {
 /*
  * path_try(path)
  *
- * verifies that a path can be used as a directory by lmc
+ * verifies that a path can be used as a directory by mii
  * will try and create it if it does not exist
  *
  * path: path to test
@@ -955,7 +956,7 @@ void usage(char* a0) {
     fprintf(stderr, "\t%-16ssearch for exact providers\n", "search <name>");
     fprintf(stderr, "\t%-16ssearch for similar providers\n\n", "like <name>");
     fprintf(stderr, "OPTIONS:\n");
-    fprintf(stderr, "\t%-16sdata directory (default: ~/.cache/lmc)\n", "-d <path>");
+    fprintf(stderr, "\t%-16sdata directory (default: ~/.cache/mii)\n", "-d <path>");
     fprintf(stderr, "\t%-16smodule path string (default: $MODULEPATH)\n", "-m <path>");
 }
 
