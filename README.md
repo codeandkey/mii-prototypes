@@ -1,7 +1,5 @@
 # mii
-[![Build Status](https://travis-ci.com/codeandkey/mii.svg?branch=master)](https://travis-ci.com/codeandkey/lmc)
-
-lightweight module cache
+[![Build Status](https://travis-ci.com/codeandkey/mii.svg?branch=master)](https://travis-ci.com/codeandkey/mii)
 
 mii automatically caches and loads environment modules for you. It works by hooking into your shells' "command not found" event and using that opportunity to see if any modules
 would provide your command.
