@@ -1,7 +1,8 @@
-build
 doc/*.aux
 doc/*.bbl
 doc/*.blg
 doc/*.log
 doc/*.cut
 doc/*.out
+/target
+**/*.rs.bk

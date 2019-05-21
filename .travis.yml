@@ -1,9 +1,9 @@
-language: c
-compiler: gcc
-before_install:
-    - sudo apt-get install libsqlite3-dev
-script:
-    - mkdir build
-    - cd build
-    - cmake ..
-    - make
+language: rust
+rust:
+    - stable
+    - beta
+    - nightly
+matrix:
+    allow_failures:
+        - rust: nightly
+    fast_finish: true
