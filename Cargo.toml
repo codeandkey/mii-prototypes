@@ -1,7 +1,10 @@
 [package]
-name = "mii"
+name    = "mii"
 version = "0.1.0"
 authors = ["Justin Stanley <jtst@iastate.edu>"]
 edition = "2018"
 
 [dependencies]
+fasthash          = "0.4.0"
+log               = "0.4"
+pretty_env_logger = "0.3"
