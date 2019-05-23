@@ -21,12 +21,11 @@ pub struct Module {
     bins: Vec<String>,
 }
 
-pub struct DB<'a> {
+pub struct DB {
     conn: Connection,
-    compare_module: Option<Statement<'a>>,
 }
 
-impl<'a> DB<'a> {
+impl DB {
     pub fn initialize(db_path: &Path) {
         match Connection::open(db_path) {
             Ok(conn) => {
@@ -45,7 +44,6 @@ impl<'a> DB<'a> {
             Ok(conn) => {
                 DB {
                     conn: conn,
-                    compare_module: None,
                 }
             },
             Err(e) => {
