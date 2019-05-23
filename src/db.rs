@@ -78,7 +78,7 @@ impl DB {
      * update_modules synchronizes local analyzed modules to the db
      */
 
-    pub fn update_modules(&mut self, res: &Vec<analysis::Result>, nonce: u32) {
+    pub fn update_modules(&mut self, res: &Vec<analysis::Info>, nonce: u32) {
         let tx = self.conn.transaction().unwrap();
 
         {

@@ -1,5 +1,5 @@
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
 
 mod analysis;
 mod crawl;
@@ -37,10 +37,7 @@ fn main() {
     info!("Performing analysis phase on {} modules..", to_update.len());
     
     let analysis_time = SystemTime::now();
-    let analysis_results: Vec<analysis::Result> = to_update.into_iter().map(|x| analysis::Result {
-        file: x,
-        bins: Vec::new(),
-    }).collect();
+    let analysis_results: Vec<analysis::Info> = to_update.into_iter().map(|x| analysis::analyze(x)).filter_map(Result::ok).collect();
 
     debug!("Finished analysis phase in {} ms", SystemTime::now().duration_since(analysis_time).unwrap().as_millis());
     info!("Performing update phase on {} modules..", analysis_results.len());
