@@ -26,7 +26,7 @@ pub struct ModuleFile {
     pub path: PathBuf,
     pub code: String,
     pub modtype: ModuleType,
-    pub hash: Option<u64>, /* not filled at first. */
+    pub hash: Option<u32>, /* not filled at first. */
 }
 
 pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
@@ -52,7 +52,6 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
 
     debug!("Waiting for response from crawler..");
     while let Some(loc) = rx.recv().unwrap() {
-        info!("received module {} : {}", loc.code, loc.path.display());
         num_module_files += 1;
 
         match File::open(&loc.path).and_then(|mut f| {
@@ -68,7 +67,7 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
                     path: loc.path,
                     code: loc.code,
                     modtype: loc.modtype,
-                    hash: Some(xx::hash64(data)),
+                    hash: Some(xx::hash32(data)),
                 });
             },
         }
