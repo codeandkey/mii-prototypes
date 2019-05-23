@@ -30,13 +30,7 @@ fn main() {
     info!("Performing verify phase on {} entries..", a.len());
     let verify_time = SystemTime::now();
 
-    let to_update: Vec<crawl::ModuleFile> = a.into_iter().filter_map(|x| {
-        if db.compare_module(&x, nonce) {
-            Some(x)
-        } else {
-            None
-        }
-    }).collect();
+    let to_update = db.compare_modules(a, nonce);
 
     debug!("Finished verify phase in {} ms", SystemTime::now().duration_since(verify_time).unwrap().as_millis());
     info!("Performing analysis phase on {} modules..", to_update.len());

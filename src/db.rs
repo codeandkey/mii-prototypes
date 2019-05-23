@@ -73,6 +73,11 @@ impl<'a> DB<'a> {
                           params![nonce, local.code, local.path.to_string_lossy(), local.hash]).unwrap() < 1
     }
 
+    pub fn compare_modules(&mut self, local: Vec<crawl::ModuleFile>, nonce: u32) -> Vec<crawl::ModuleFile> {
+        let mut stmt = self.conn.prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?").unwrap();
+        local.into_iter().filter(|x| stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash]).unwrap() < 1).collect()
+    }
+
     /*
      * update_module updates an existing module or adds a new one to the database
      */
