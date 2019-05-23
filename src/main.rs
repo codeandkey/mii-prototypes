@@ -5,6 +5,7 @@ mod analysis;
 mod crawl;
 mod db;
 
+use rand;
 use std::env;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +26,7 @@ fn main() {
 
     let mut db = db::DB::new(&Path::new("neat"));
 
-    let nonce = 1337;
+    let nonce = rand::random::<u32>();
 
     info!("Performing verify phase on {} entries..", a.len());
     let verify_time = SystemTime::now();
@@ -47,4 +48,9 @@ fn main() {
     let update_time = SystemTime::now();
     db.update_modules(&analysis_results, nonce);
     debug!("Finished update phase in {} ms", SystemTime::now().duration_since(update_time).unwrap().as_millis());
+
+    info!("Performing orphan phase..");
+    let orphan_time = SystemTime::now();
+    let res = db.flush_orphans(nonce);
+    debug!("Finished orphan phase ({} orphans killed) in {} ms", res, SystemTime::now().duration_since(update_time).unwrap().as_millis());
 }

@@ -59,27 +59,25 @@ impl<'a> DB<'a> {
      * multithreaded phases should be implemented elsewhere
      */
 
-    pub fn init_statements(&'a mut self) {
-        self.compare_module = Some(self.conn.prepare("UPDATE modules SET nonce=? code=? WHERE path=? AND hash=?").unwrap());
-    }
-
     /*
-     * compare_local_module checks if there is an up-to-date entry in the
-     * local module database. returns TRUE if an analysis and update is required
+     * compare_modules checks if there is an up-to-date entry in the local db
      */
 
-    pub fn compare_module(&mut self, local: &crawl::ModuleFile, nonce: u32) -> bool {
-        self.conn.execute("UPDATE modules SET nonce=$1, code=$2 WHERE path=$3 AND hash=$4",
-                          params![nonce, local.code, local.path.to_string_lossy(), local.hash]).unwrap() < 1
-    }
-
     pub fn compare_modules(&mut self, local: Vec<crawl::ModuleFile>, nonce: u32) -> Vec<crawl::ModuleFile> {
-        let mut stmt = self.conn.prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?").unwrap();
-        local.into_iter().filter(|x| stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash]).unwrap() < 1).collect()
+        let tx = self.conn.transaction().unwrap();
+        let mut ret = Vec::new();
+
+        {
+            let mut stmt = tx.prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?").unwrap();
+            ret = local.into_iter().filter(|x| stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash]).unwrap() < 1).collect();
+        }
+
+        tx.commit();
+        ret
     }
 
     /*
-     * update_module updates an existing module or adds a new one to the database
+     * update_modules synchronizes local analyzed modules to the db
      */
 
     pub fn update_modules(&mut self, res: &Vec<analysis::Result>, nonce: u32) {
@@ -96,17 +94,43 @@ impl<'a> DB<'a> {
         tx.commit();
     }
 
-    pub fn update_module(&self, local: &crawl::ModuleFile, res: &analysis::Result, nonce: u32) {
-        self.conn.execute("INSERT INTO modules VALUES (0, $1, $2, $3, $4) ON CONFLICT(path) DO UPDATE SET code=$2, nonce=$3, hash=$4",
-                          params![local.path.to_string_lossy(), local.code, nonce, local.hash]);
-        debug!("updated module {} in local database", local.code);
-    }
-
     /*
      * flush_orphans removes any module entry that fails the nonce test.
      * this will cover every module which no longer exists in the filesystem (orphaned entries)
+     *
+     * returns number of orphaned modules
      */
 
-    fn flush_orphans(&self, nonce: u32) {
+    pub fn flush_orphans(&mut self, nonce: u32) -> usize {
+        /*
+         * TODO: this can almost assuredly be rewritten with fewer SQL statements,
+         * possibly by using DELETE in conjunction with JOINS
+         */
+
+        let tx = self.conn.transaction().unwrap();
+        let mut res = 0;
+
+        {
+            /*
+             * first, find ids of modules we're deleting and drop
+             * any orphaned bins
+             */
+            let mut stmt_loc = tx.prepare("SELECT id FROM modules WHERE nonce!=?").unwrap();
+            let orphaned_iter: Vec<u32> = stmt_loc.query_map(params![nonce], |row| { Ok(row.get(0).unwrap()) }).unwrap().filter_map(Result::ok).collect();
+
+            let mut stmt_drop = tx.prepare("DELETE FROM bins WHERE module_id=?").unwrap();
+            for id in orphaned_iter {
+                stmt_drop.execute(params![id]).unwrap();
+            }
+
+            /*
+             * finally, drop the orphaned module entries
+             */
+
+            res = tx.execute("DELETE FROM modules WHERE nonce!=$1", params![nonce]).unwrap();
+        }
+
+        tx.commit();
+        res
     }
 }

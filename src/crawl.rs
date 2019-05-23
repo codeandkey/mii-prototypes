@@ -41,7 +41,6 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
 
     let (tx, rx): (Sender<Option<ModuleFile>>, Receiver<Option<ModuleFile>>) = channel();
 
-    debug!("Dispatching crawler thread.");
     let walker = thread::spawn(move || {
         crawl_gen(roots, tx);
     });
@@ -50,7 +49,6 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
 
     let mut num_module_files = 0;
 
-    debug!("Waiting for response from crawler..");
     while let Some(loc) = rx.recv().unwrap() {
         num_module_files += 1;
 
@@ -73,9 +71,7 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
         }
     }
 
-    debug!("Waiting for crawler thread..");
     walker.join().expect("failed to join FS walker");
-    debug!("Joined");
 
     if num_module_files == 0 {
         warn!("No module files found in MODULEPATH \"{}\". Check your configuration!", modulepath);
@@ -85,13 +81,11 @@ pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
 }
 
 fn crawl_gen(roots: Vec<String>, tx: Sender<Option<ModuleFile>>) {
-    debug!("Started crawler thread.");
     for root in roots {
         crawl_dir(&Path::new(&root), Path::new(""), &tx);
     }
 
     tx.send(None).expect("unexpected failure terminating walker stream");
-    debug!("Stopping crawler thread.");
 }
 
 fn crawl_dir(root: &Path, pfx: &Path, tx: &Sender<Option<ModuleFile>>) {
