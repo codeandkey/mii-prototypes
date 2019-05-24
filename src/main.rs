@@ -50,4 +50,8 @@ fn main() {
     let orphan_time = SystemTime::now();
     let res = db.flush_orphans(nonce);
     debug!("Finished orphan phase ({} orphans killed) in {} ms", res, SystemTime::now().duration_since(orphan_time).unwrap().as_millis());
+
+    for i in db.search_bin("ls".to_string(), false) {
+        println!("{} provided by : {}", i.command, i.code);
+    }
 }

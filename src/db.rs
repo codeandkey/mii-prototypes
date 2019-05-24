@@ -16,9 +16,9 @@ use std::path::{Path, PathBuf};
 use crate::analysis;
 use crate::crawl;
 
-pub struct Module {
-    code: String,
-    bins: Vec<String>,
+pub struct BinResult {
+    pub code: String,
+    pub command: String,
 }
 
 pub struct DB {
@@ -142,5 +142,30 @@ impl DB {
 
         tx.commit();
         res
+    }
+
+    /*
+     * search_bin searches the database for a command
+     */
+
+    pub fn search_bin(&self, command: String, exact: bool) -> Vec<BinResult> {
+        let cond = match exact {
+            true => "=?",
+            false => " LIKE ?",
+        };
+
+        let command = match exact {
+            true => command,
+            false => format!("%{}%", command),
+        };
+
+        let mut stmt = self.conn.prepare(&format!("SELECT command, code FROM bins INNER JOIN modules ON bins.module_id=modules.rowid WHERE command{}", cond)).unwrap();
+
+        stmt.query_map(params![command], |row| {
+            Ok(BinResult {
+                command: row.get(0).unwrap(),
+                code: row.get(1).unwrap(),
+            })
+        }).unwrap().filter_map(Result::ok).collect()
     }
 }
