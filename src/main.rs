@@ -4,6 +4,7 @@
 mod analysis;
 mod crawl;
 mod db;
+mod engine;
 
 use rand;
 use std::env;
@@ -11,6 +12,14 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
+    env::set_var("RUST_LOG", "mii");
+    pretty_env_logger::init();
+
+    let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap(),"neat".to_string());
+    ctrl.sync_light();
+}
+
+/*fn main() {
     env::set_var("RUST_LOG", "mii");
     pretty_env_logger::init();
 
@@ -54,4 +63,4 @@ fn main() {
     for i in db.search_bin("ls".to_string(), false) {
         println!("{} provided by : {}", i.command, i.code);
     }
-}
+}*/

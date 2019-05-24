@@ -17,11 +17,13 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 
+#[derive(Clone)]
 pub enum ModuleType {
     LMOD,
     TCL,
 }
 
+#[derive(Clone)]
 pub struct ModuleFile {
     pub path: PathBuf,
     pub code: String,
@@ -29,13 +31,8 @@ pub struct ModuleFile {
     pub hash: Option<u32>, /* not filled at first. */
 }
 
-pub fn crawl_sync(modulepath: Option<String>) -> Vec<ModuleFile> {
+pub fn crawl_sync(modulepath: String) -> Vec<ModuleFile> {
     let mut output = Vec::new();
-
-    let modulepath = match modulepath {
-        Some(path) => path,
-        None => env::var("MODULEPATH").unwrap_or(String::new()),
-    };
 
     let roots: Vec<String> = modulepath.split(':').map(|x| x.to_string()).collect();
 
