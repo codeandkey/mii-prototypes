@@ -11,15 +11,21 @@ use crate::analysis;
 use crate::crawl;
 use crate::db;
 
+use std::cmp;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
+use std::time::SystemTime;
+
+const MAX_THREADS: usize = 4;
+
 pub struct Engine {
     db_path: String,
     db_conn: db::DB,
     modulepath: String,
+    num_threads: usize,
 }
 
 impl Engine {
@@ -30,6 +36,7 @@ impl Engine {
             db_conn: db::DB::new(Path::new(&db_path)),
             db_path: db_path,
             modulepath: modulepath,
+            num_threads: cmp::min(num_cpus::get(), MAX_THREADS),
         }
     }
 
@@ -51,11 +58,14 @@ impl Engine {
         /* crawl phase: singlethreaded */
 
         debug!("Starting crawl phase.");
+        let crawl_time = SystemTime::now();
         let files = crawl::crawl_sync(self.modulepath.clone());
+        debug!("Finished crawl phase in {} ms.", SystemTime::now().duration_since(crawl_time).unwrap().as_millis());
 
         /* verify phase: multithreaded! */
 
         debug!("Starting verify phase ({})..", files.len());
+        let verify_time = SystemTime::now();
         let (tx, rx): (mpsc::Sender<Vec<crawl::ModuleFile>>, mpsc::Receiver<Vec<crawl::ModuleFile>>) = mpsc::channel();
 
         /* 
@@ -63,7 +73,7 @@ impl Engine {
          * through the mpsc.
          */
 
-        let verify_chunk_size = files.len() / num_cpus::get() + 1;
+        let verify_chunk_size = files.len() / self.num_threads + 1;
         let mut workers = Vec::new();
 
         for chunk in files.chunks(verify_chunk_size) {
@@ -97,9 +107,11 @@ impl Engine {
             worker.join();
         }
 
+        debug!("Finished verify phase in {} ms.", SystemTime::now().duration_since(verify_time).unwrap().as_millis());
         debug!("Starting analysis phase ({})..", verify_results.len());
 
-        let analysis_chunk_size = verify_results.len() / num_cpus::get() + 1;
+        let analysis_time = SystemTime::now();
+        let analysis_chunk_size = verify_results.len() / self.num_threads + 1;
         let mut analysis_workers = Vec::new();
 
         for chunk in verify_results.chunks(analysis_chunk_size) {
@@ -118,6 +130,7 @@ impl Engine {
             worker.join();
         }
 
+        debug!("Finished analysis phase in {} ms.", SystemTime::now().duration_since(analysis_time).unwrap().as_millis());
         debug!("Starting orphan phase..");
         self.db_conn.flush_orphans(nonce);
 
