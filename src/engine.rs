@@ -135,6 +135,7 @@ impl Engine {
         debug!("All done!");
     }
 
-    pub fn search_bin_exact(&self, cmd: String) {
+    pub fn search_bin_exact(&self, cmd: String) -> Vec<db::BinResult> {
+        self.db_conn.search_bin(cmd)
     }
 }

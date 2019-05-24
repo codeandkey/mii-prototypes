@@ -26,6 +26,10 @@ fn main() {
         (@subcommand build =>
             (about: "Build a clean module index")
         )
+        (@subcommand exact =>
+            (about: "Search for an exact command")
+            (@arg command: +required "Command to search")
+        )
     ).get_matches();
 
     if matches.is_present("debug") {
@@ -56,5 +60,15 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("build") {
         panic!("not implemented yet");
+    }
+
+    if let Some(matches) = matches.subcommand_matches("exact") {
+        let res = ctrl.search_bin_exact(matches.value_of("command").unwrap().to_string());
+
+        println!("[");
+        for r in res {
+            println!("    {{\"{}\":\"{}\"}},", r.code, r.command);
+        }
+        println!("]");
     }
 }
