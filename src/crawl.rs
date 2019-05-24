@@ -95,13 +95,14 @@ fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
         if let Ok(entry) = entry {
             if entry.file_type().is_file() {
                 let path = entry.path();
+                let code_path = path.strip_prefix(root).unwrap();
 
                 let (mod_type, mod_code) = match path.extension() {
                     Some(ext) => match ext.to_str() {
-                        Some("lua") => (ModuleType::LMOD, path.file_stem().unwrap()),
-                        _ => (ModuleType::TCL, entry.file_name()),
+                        Some("lua") => (ModuleType::LMOD, code_path.parent().unwrap().join(path.file_stem().unwrap())),
+                        _ => (ModuleType::TCL, code_path.to_path_buf()),
                     },
-                    None => (ModuleType::TCL, entry.file_name()), /* noice */
+                    None => (ModuleType::TCL, code_path.to_path_buf()), /* noice */
                 };
 
                 tx.send(Some(ModuleFile {
