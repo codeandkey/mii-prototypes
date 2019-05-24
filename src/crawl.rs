@@ -16,6 +16,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
+use walkdir::WalkDir;
 
 #[derive(Clone)]
 pub enum ModuleType {
@@ -79,48 +80,36 @@ pub fn crawl_sync(modulepath: String) -> Vec<ModuleFile> {
 
 fn crawl_gen(roots: Vec<String>, tx: Sender<Option<ModuleFile>>) {
     for root in roots {
-        crawl_dir(&Path::new(&root), Path::new(""), &tx);
+        crawl_dir(&Path::new(&root), &tx);
     }
 
     tx.send(None).expect("unexpected failure terminating walker stream");
 }
 
-fn crawl_dir(root: &Path, pfx: &Path, tx: &Sender<Option<ModuleFile>>) {
-    let rel = root.join(pfx);
+fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
+    let walker = WalkDir::new(root).into_iter();
 
-    if let Ok(entries) = fs::read_dir(&rel) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                if let Ok(file_type) = entry.file_type() {
-                    if file_type.is_dir() {
-                        /* directory -- continue crawling unless ignoring */
-                        if !entry.file_name().into_string().unwrap().starts_with(".") {
-                            crawl_dir(root, &pfx.join(entry.file_name()), tx);
-                        }
-                    } else {
-                        /* file -- grab extension and send back through tx */
+    for entry in walker.filter_entry(|e| {
+        e.file_name().to_str().map(|s| s.starts_with(".")).unwrap_or(false)
+    }) {
+        if let Ok(entry) = entry {
+            if entry.file_type().is_file() {
+                let path = entry.path();
 
-                        let mod_type = match entry.path().extension() {
-                            Some(ext) => match ext.to_str() {
-                                Some("lua") => ModuleType::LMOD,
-                                _ => ModuleType::TCL,
-                            },
-                            None => ModuleType::TCL,
-                        };
+                let (mod_type, mod_code) = match path.extension() {
+                    Some(ext) => match ext.to_str() {
+                        Some("lua") => (ModuleType::LMOD, path.file_stem().unwrap()),
+                        _ => (ModuleType::TCL, entry.file_name()),
+                    },
+                    None => (ModuleType::TCL, entry.file_name()), /* noice */
+                };
 
-                        let mod_code = match mod_type {
-                            ModuleType::LMOD => pfx.join(entry.path().file_stem().unwrap()),
-                            ModuleType::TCL => pfx.join(entry.file_name()),
-                        };
-
-                        tx.send(Some(ModuleFile {
-                            path: entry.path(),
-                            code: mod_code.to_str().unwrap().to_string(),
-                            modtype: mod_type,
-                            hash: None,
-                        })).expect("unexpected mpsc send fail");
-                    }
-                }
+                tx.send(Some(ModuleFile {
+                    path: path.to_path_buf(),
+                    code: mod_code.to_string_lossy().to_string(),
+                    modtype: mod_type,
+                    hash: None,
+                })).expect("unexpected mpsc send fail");
             }
         }
     }
