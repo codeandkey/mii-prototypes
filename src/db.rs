@@ -30,7 +30,7 @@ impl DB {
         match Connection::open(db_path) {
             Ok(conn) => {
                 /* initialize database tables */
-                conn.execute("CREATE TABLE IF NOT EXISTS modules (id INT PRIMARY_KEY AUTO_INCREMENT, path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT)", NO_PARAMS).unwrap();
+                conn.execute("CREATE TABLE IF NOT EXISTS modules (path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT)", NO_PARAMS).unwrap();
                 conn.execute("CREATE TABLE IF NOT EXISTS bins (module_id INT, command TEXT)", NO_PARAMS).unwrap();
             },
             Err(e) => {
@@ -82,10 +82,22 @@ impl DB {
         let tx = self.conn.transaction().unwrap();
 
         {
-            let mut stmt = tx.prepare("INSERT INTO modules VALUES (0, ?1, ?2, ?3, ?4) ON CONFLICT(path) DO UPDATE SET code=?2, nonce=?3, hash=?4").unwrap();
+            let mut stmt = tx.prepare("INSERT INTO modules (path, code, nonce, hash) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(path) DO UPDATE SET code=?2, nonce=?3, hash=?4").unwrap();
+            let mut flush_bin_stmt = tx.prepare("DELETE FROM bins WHERE module_id=?").unwrap();
+            let mut bin_stmt = tx.prepare("INSERT INTO bins VALUES (?, ?)").unwrap();
 
             for m in res {
                 stmt.execute(params![m.file.path.to_string_lossy(), m.file.code, nonce, m.file.hash]).unwrap();
+
+                let mod_id = tx.last_insert_rowid(); /* let's pray together that this works with an upsert clause */
+
+                /* drop out-of-date bins from the db */
+                flush_bin_stmt.execute(params![mod_id]).unwrap();
+
+                /* add new bins back into the db */
+                for bin in m.bins.iter() {
+                    bin_stmt.execute(params![mod_id, bin]).unwrap();
+                }
             }
         }
 
@@ -113,7 +125,7 @@ impl DB {
              * first, find ids of modules we're deleting and drop
              * any orphaned bins
              */
-            let mut stmt_loc = tx.prepare("SELECT id FROM modules WHERE nonce!=?").unwrap();
+            let mut stmt_loc = tx.prepare("SELECT rowid FROM modules WHERE nonce!=?").unwrap();
             let orphaned_iter: Vec<u32> = stmt_loc.query_map(params![nonce], |row| { Ok(row.get(0).unwrap()) }).unwrap().filter_map(Result::ok).collect();
 
             let mut stmt_drop = tx.prepare("DELETE FROM bins WHERE module_id=?").unwrap();
