@@ -1,3 +1,4 @@
+#[macro_use] extern crate clap;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 
@@ -8,59 +9,57 @@ mod engine;
 
 use rand;
 use std::env;
+use std::fs::DirBuilder;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
-    env::set_var("RUST_LOG", "mii");
-    pretty_env_logger::init();
+    let matches = clap_app!(mii =>
+        (version: "1.0")
+        (author: "Justin Stanley <jtst@iastate.edu>")
+        (about: "Module Inverted Index")
+        (@arg debug: -d --debug "Enable verbose logging to stderr")
+        (@arg datadir: -s --datadir +takes_value "Override data directory")
+        (@subcommand verify =>
+            (about: "Verify and synchronize module index")
+        )
+        (@subcommand build =>
+            (about: "Build a clean module index")
+        )
+    ).get_matches();
 
-    let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap(),"neat".to_string());
-    ctrl.sync_light();
-}
-
-/*fn main() {
-    env::set_var("RUST_LOG", "mii");
-    pretty_env_logger::init();
-
-    info!("Initializing Mii engine..");
-
-    info!("Performing crawl phase..");
-
-    let crawl_time = SystemTime::now();
-    let a = crawl::crawl_sync(None);
-    debug!("Finished crawl phase in {} ms", SystemTime::now().duration_since(crawl_time).unwrap().as_millis());
-
-    db::DB::initialize(&Path::new("neat"));
-
-    let mut db = db::DB::new(&Path::new("neat"));
-
-    let nonce = rand::random::<u32>();
-
-    info!("Performing verify phase on {} entries..", a.len());
-    let verify_time = SystemTime::now();
-
-    let to_update = db.compare_modules(a, nonce);
-
-    debug!("Finished verify phase in {} ms", SystemTime::now().duration_since(verify_time).unwrap().as_millis());
-    info!("Performing analysis phase on {} modules..", to_update.len());
-    
-    let analysis_time = SystemTime::now();
-    let analysis_results: Vec<analysis::Info> = to_update.into_iter().map(|x| analysis::analyze(x)).filter_map(Result::ok).collect();
-
-    debug!("Finished analysis phase in {} ms", SystemTime::now().duration_since(analysis_time).unwrap().as_millis());
-    info!("Performing update phase on {} modules..", analysis_results.len());
-
-    let update_time = SystemTime::now();
-    db.update_modules(&analysis_results, nonce);
-    debug!("Finished update phase in {} ms", SystemTime::now().duration_since(update_time).unwrap().as_millis());
-
-    info!("Performing orphan phase..");
-    let orphan_time = SystemTime::now();
-    let res = db.flush_orphans(nonce);
-    debug!("Finished orphan phase ({} orphans killed) in {} ms", res, SystemTime::now().duration_since(orphan_time).unwrap().as_millis());
-
-    for i in db.search_bin("ls".to_string(), false) {
-        println!("{} provided by : {}", i.command, i.code);
+    if matches.is_present("debug") {
+        env::set_var("RUST_LOG", "mii");
+        pretty_env_logger::init();
     }
-}*/
+
+    /*
+     * before starting the engine, make sure the database dir is good to go
+     */
+
+    let datadir = match matches.value_of("datadir") {
+        Some(x) => x.to_string(),
+        None => dirs::data_local_dir().unwrap().join("mii").to_string_lossy().to_string(),
+    };
+
+    let datadir = Path::new(&datadir);
+
+    if datadir.is_dir() {
+        /* try and initialize a data dir here */
+        info!("Initializing a fresh data directory in {}", datadir.display());
+
+        if let Err(e) = DirBuilder::new().recursive(true).create(&datadir) {
+            panic!("Failed to initialize data directory in {} : {}", datadir.display(), e.to_string());
+        }
+    }
+
+    let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap_or(String::new()), datadir.join("index.db"));
+
+    if let Some(matches) = matches.subcommand_matches("verify") {
+        ctrl.sync_light();
+    }
+
+    if let Some(matches) = matches.subcommand_matches("build") {
+        panic!("not implemented yet");
+    }
+}

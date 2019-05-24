@@ -22,18 +22,18 @@ use std::time::SystemTime;
 const MAX_THREADS: usize = 4;
 
 pub struct Engine {
-    db_path: String,
+    db_path: PathBuf,
     db_conn: db::DB,
     modulepath: String,
     num_threads: usize,
 }
 
 impl Engine {
-    pub fn new(modulepath: String, db_path: String) -> Engine {
-        db::DB::initialize(Path::new(&db_path));
+    pub fn new(modulepath: String, db_path: PathBuf) -> Engine {
+        db::DB::initialize(&db_path);
 
         Engine {
-            db_conn: db::DB::new(Path::new(&db_path)),
+            db_conn: db::DB::new(&db_path),
             db_path: db_path,
             modulepath: modulepath,
             num_threads: cmp::min(num_cpus::get(), MAX_THREADS),
@@ -104,7 +104,7 @@ impl Engine {
         }
 
         for worker in workers {
-            worker.join();
+            worker.join().expect("verify thread panicked, aborting");
         }
 
         debug!("Finished verify phase in {} ms.", SystemTime::now().duration_since(verify_time).unwrap().as_millis());
@@ -124,10 +124,8 @@ impl Engine {
             }));
         }
 
-        debug!("Waiting for {} analysis workers..", analysis_workers.len());
-
         for worker in analysis_workers {
-            worker.join();
+            worker.join().expect("analysis thread panicked, aborting");
         }
 
         debug!("Finished analysis phase in {} ms.", SystemTime::now().duration_since(analysis_time).unwrap().as_millis());
@@ -137,5 +135,6 @@ impl Engine {
         debug!("All done!");
     }
 
-    pub fn search_bin_exact(&self, cmd: String) {}
+    pub fn search_bin_exact(&self, cmd: String) {
+    }
 }
