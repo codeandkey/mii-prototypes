@@ -49,5 +49,5 @@ fn main() {
     info!("Performing orphan phase..");
     let orphan_time = SystemTime::now();
     let res = db.flush_orphans(nonce);
-    debug!("Finished orphan phase ({} orphans killed) in {} ms", res, SystemTime::now().duration_since(update_time).unwrap().as_millis());
+    debug!("Finished orphan phase ({} orphans killed) in {} ms", res, SystemTime::now().duration_since(orphan_time).unwrap().as_millis());
 }
