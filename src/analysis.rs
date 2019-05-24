@@ -55,7 +55,7 @@ fn search_path(path: String) -> Vec<String> {
             if let Ok(entry) = entry {
                 if let Ok(file_type) = entry.file_type() {
                     if is_executable::is_executable(entry.path()) {
-                        output.push(entry.path().to_string_lossy().to_string());
+                        output.push(entry.path().file_name().unwrap().to_string_lossy().to_string());
                     }
                 }
             }
