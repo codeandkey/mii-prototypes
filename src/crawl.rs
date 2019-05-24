@@ -96,8 +96,10 @@ fn crawl_dir(root: &Path, pfx: &Path, tx: &Sender<Option<ModuleFile>>) {
             if let Ok(entry) = entry {
                 if let Ok(file_type) = entry.file_type() {
                     if file_type.is_dir() {
-                        /* directory -- continue crawling */
-                        crawl_dir(root, &pfx.join(entry.file_name()), tx);
+                        /* directory -- continue crawling unless ignoring */
+                        if !entry.file_name().into_string().unwrap().starts_with(".") {
+                            crawl_dir(root, &pfx.join(entry.file_name()), tx);
+                        }
                     } else {
                         /* file -- grab extension and send back through tx */
 
