@@ -42,6 +42,8 @@ impl DB {
     pub fn new(db_path: &Path) -> DB {
         match Connection::open(db_path) {
             Ok(conn) => {
+                conn.pragma_update(None, "journal_mode", &"WAL").unwrap();
+
                 DB {
                     conn: conn,
                 }
