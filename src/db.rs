@@ -33,7 +33,7 @@ impl DB {
                 conn.execute("CREATE TABLE IF NOT EXISTS modules (path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT, bins TEXT)", NO_PARAMS).unwrap();
             },
             Err(e) => {
-                panic!("Failed to open database file: {}", e);
+                panic!("Failed to open database file {}: {}", db_path.display(), e);
             },
         }
     }
@@ -71,7 +71,7 @@ impl DB {
             ret = local.into_iter().filter(|x| stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash]).unwrap() < 1).collect();
         }
 
-        tx.commit();
+        tx.commit().expect("transaction failed");
         ret
     }
 
@@ -90,7 +90,7 @@ impl DB {
             }
         }
 
-        tx.commit();
+        tx.commit().expect("transaction failed");
     }
 
     /*
@@ -117,7 +117,7 @@ impl DB {
             res = tx.execute("DELETE FROM modules WHERE nonce!=$1", params![nonce]).unwrap();
         }
 
-        tx.commit();
+        tx.commit().expect("transaction failed");
         res
     }
 
