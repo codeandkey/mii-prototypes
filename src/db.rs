@@ -30,8 +30,7 @@ impl DB {
         match Connection::open(db_path) {
             Ok(conn) => {
                 /* initialize database tables */
-                conn.execute("CREATE TABLE IF NOT EXISTS modules (path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT)", NO_PARAMS).unwrap();
-                conn.execute("CREATE TABLE IF NOT EXISTS bins (module_id INT, command TEXT)", NO_PARAMS).unwrap();
+                conn.execute("CREATE TABLE IF NOT EXISTS modules (path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT, bins TEXT)", NO_PARAMS).unwrap();
             },
             Err(e) => {
                 panic!("Failed to open database file: {}", e);
@@ -84,22 +83,10 @@ impl DB {
         let tx = self.conn.transaction().unwrap();
 
         {
-            let mut stmt = tx.prepare("INSERT INTO modules (path, code, nonce, hash) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(path) DO UPDATE SET code=?2, nonce=?3, hash=?4").unwrap();
-            let mut flush_bin_stmt = tx.prepare("DELETE FROM bins WHERE module_id=?").unwrap();
-            let mut bin_stmt = tx.prepare("INSERT INTO bins VALUES (?, ?)").unwrap();
+            let mut stmt = tx.prepare("INSERT INTO modules VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(path) DO UPDATE SET code=?2, nonce=?3, hash=?4, bins=?5").unwrap();
 
             for m in res {
-                stmt.execute(params![m.file.path.to_string_lossy(), m.file.code, nonce, m.file.hash]).unwrap();
-
-                let mod_id = tx.last_insert_rowid(); /* let's pray together that this works with an upsert clause */
-
-                /* drop out-of-date bins from the db */
-                flush_bin_stmt.execute(params![mod_id]).unwrap();
-
-                /* add new bins back into the db */
-                for bin in m.bins.iter() {
-                    bin_stmt.execute(params![mod_id, bin]).unwrap();
-                }
+                stmt.execute(params![m.file.path.to_string_lossy(), m.file.code, nonce, m.file.hash, m.bins.join(":")]).unwrap();
             }
         }
 
@@ -124,19 +111,7 @@ impl DB {
 
         {
             /*
-             * first, find ids of modules we're deleting and drop
-             * any orphaned bins
-             */
-            let mut stmt_loc = tx.prepare("SELECT rowid FROM modules WHERE nonce!=?").unwrap();
-            let orphaned_iter: Vec<u32> = stmt_loc.query_map(params![nonce], |row| { Ok(row.get(0).unwrap()) }).unwrap().filter_map(Result::ok).collect();
-
-            let mut stmt_drop = tx.prepare("DELETE FROM bins WHERE module_id=?").unwrap();
-            for id in orphaned_iter {
-                stmt_drop.execute(params![id]).unwrap();
-            }
-
-            /*
-             * finally, drop the orphaned module entries
+             * drop the orphaned module entries
              */
 
             res = tx.execute("DELETE FROM modules WHERE nonce!=$1", params![nonce]).unwrap();
@@ -150,24 +125,22 @@ impl DB {
      * search_bin searches the database for a command
      */
 
-    pub fn search_bin(&self, command: String, exact: bool) -> Vec<BinResult> {
-        let cond = match exact {
-            true => "=?",
-            false => " LIKE ?",
-        };
+    pub fn search_bin(&self, command: String) -> Vec<BinResult> {
+        let cmd_param = format!("%{}%", command);
+        let mut stmt = self.conn.prepare("SELECT bins, code FROM modules WHERE bins LIKE ?").unwrap();
 
-        let command = match exact {
-            true => command,
-            false => format!("%{}%", command),
-        };
+        stmt.query_map(params![cmd_param], |row| {
+            let row_bin_col: String = row.get(0).unwrap();
+            let row_bins: Vec<String> = row_bin_col.split(":").map(|x| x.to_string()).collect();
 
-        let mut stmt = self.conn.prepare(&format!("SELECT command, code FROM bins INNER JOIN modules ON bins.module_id=modules.rowid WHERE command{}", cond)).unwrap();
+            if row_bins.contains(&command) {
+                return Ok(Some(BinResult {
+                    command: command.clone(),
+                    code: row.get(1).unwrap(),
+                }));
+            }
 
-        stmt.query_map(params![command], |row| {
-            Ok(BinResult {
-                command: row.get(0).unwrap(),
-                code: row.get(1).unwrap(),
-            })
-        }).unwrap().filter_map(Result::ok).collect()
+            Ok(None)
+        }).unwrap().filter_map(Result::ok).filter_map(|x| x).collect()
     }
 }
