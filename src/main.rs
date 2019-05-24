@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     let matches = clap_app!(mii =>
-        (version: "1.0")
+        (version: "0.1")
         (author: "Justin Stanley <jtst@iastate.edu>")
         (about: "Module Inverted Index")
         (@arg debug: -d --debug "Enable verbose logging to stderr")
@@ -44,13 +44,8 @@ fn main() {
 
     let datadir = Path::new(&datadir);
 
-    if datadir.is_dir() {
-        /* try and initialize a data dir here */
-        info!("Initializing a fresh data directory in {}", datadir.display());
-
-        if let Err(e) = DirBuilder::new().recursive(true).create(&datadir) {
-            panic!("Failed to initialize data directory in {} : {}", datadir.display(), e.to_string());
-        }
+    if let Err(e) = DirBuilder::new().recursive(true).create(&datadir) {
+        panic!("Failed to initialize data directory in {} : {}", datadir.display(), e.to_string());
     }
 
     let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap_or(String::new()), datadir.join("index.db"));
