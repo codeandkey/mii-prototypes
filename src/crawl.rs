@@ -90,7 +90,7 @@ fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
     let walker = WalkDir::new(root).into_iter();
 
     for entry in walker.filter_entry(|e| {
-        e.file_name().to_str().map(|s| s.starts_with(".")).unwrap_or(false)
+        e.file_name().to_str().map(|s| !s.starts_with(".")).unwrap_or(false)
     }) {
         if let Ok(entry) = entry {
             if entry.file_type().is_file() {
