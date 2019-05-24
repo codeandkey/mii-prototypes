@@ -24,8 +24,6 @@ pub fn analyze(file: crawl::ModuleFile) -> Result<Info, io::Error> {
     let contents = fs::read_to_string(&file.path)?;
     let bins = analyze_bins(&contents, &file.modtype);
 
-    println!("analysis for {} : {:?}", file.code, bins);
-
     Ok(Info {
         file: file,
         bins: bins,
@@ -38,11 +36,6 @@ fn analyze_bins(contents: &String, modtype: &crawl::ModuleType) -> Vec<String> {
         _ => Vec::new(),
     };
 
-    /* with the pathlist available, walk through and search for binaries */
-    for path in paths.iter() {
-        debug!("found path: {}", path);
-    }
-
     paths.into_iter().map(|p| search_path(p)).flatten().collect()
 }
 
@@ -51,7 +44,6 @@ fn extract_lmod_paths(contents: &String) -> Vec<String> {
         static ref lmod_path_reg: Regex = RegexBuilder::new(lmod_path_reg_src).multi_line(true).build().unwrap();
     }
 
-    println!("performing regex test on {}", contents);
     lmod_path_reg.captures_iter(contents).map(|x| x[1].to_string()).collect()
 }
 
