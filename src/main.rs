@@ -10,6 +10,7 @@ mod crawl;
 mod db;
 mod engine;
 
+use clap::AppSettings;
 use std::env;
 use std::fs::DirBuilder;
 use std::path::Path;
@@ -19,6 +20,7 @@ fn main() {
         (version: "0.1")
         (author: "Justin Stanley <jtst@iastate.edu>")
         (about: "Module Inverted Index")
+        (setting: AppSettings::SubcommandRequiredElseHelp)
         (@arg debug: -d --debug "Enable verbose logging to stderr")
         (@arg datadir: -s --datadir +takes_value "Override data directory")
         (@subcommand sync =>
