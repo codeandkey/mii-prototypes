@@ -145,6 +145,36 @@ impl DB {
     }
 
     /*
+     * search_bin_fuzzy searches the database for similar commands
+     */
+
+    pub fn search_bin_fuzzy(&self, command: String) -> Vec<BinResult> {
+        let cmd_param = format!("%{}%", command);
+        let mut stmt = self.conn.prepare("SELECT bins, code FROM modules WHERE bins LIKE ?").unwrap();
+
+        let vecs: Vec<Vec<BinResult>> = stmt.query_map(params![cmd_param], |row| {
+            let row_bin_col: String = row.get(0).unwrap();
+            let row_bins: Vec<String> = row_bin_col.split(":").map(|x| x.to_string()).collect();
+
+            let mut out = Vec::new();
+            let row_code: String = row.get(1).unwrap();
+
+            for bin in row_bins {
+                if bin.contains(&command) {
+                    out.push(BinResult {
+                        command: bin,
+                        code: row_code.clone(),
+                    });
+                }
+            }
+
+            Ok(out)
+        }).unwrap().filter_map(Result::ok).collect();
+
+        vecs.into_iter().flatten().collect()
+    }
+
+    /*
      * purge() clears out the whole module table
      */
     pub fn purge(&self) {

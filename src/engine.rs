@@ -142,4 +142,8 @@ impl Engine {
     pub fn search_bin_exact(&self, cmd: String) -> Vec<db::BinResult> {
         self.db_conn.search_bin(cmd)
     }
+
+    pub fn search_bin_fuzzy(&self, cmd: String) -> Vec<db::BinResult> {
+        self.db_conn.search_bin_fuzzy(cmd)
+    }
 }

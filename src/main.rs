@@ -30,6 +30,10 @@ fn main() {
             (about: "Search for an exact command")
             (@arg command: +required "Command to search")
         )
+        (@subcommand glob =>
+            (about: "Search for similar commands")
+            (@arg command: +required "Command hint")
+        )
     ).get_matches();
 
     if matches.is_present("debug") {
@@ -66,6 +70,16 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("exact") {
         let res = ctrl.search_bin_exact(matches.value_of("command").unwrap().to_string());
+
+        println!("[");
+        for r in res {
+            println!("    {{\"{}\":\"{}\"}},", r.code, r.command);
+        }
+        println!("]");
+    }
+
+    if let Some(matches) = matches.subcommand_matches("glob") {
+        let res = ctrl.search_bin_fuzzy(matches.value_of("command").unwrap().to_string());
 
         println!("[");
         for r in res {
