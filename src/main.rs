@@ -1,6 +1,9 @@
-#[macro_use] extern crate clap;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
 
 mod analysis;
 mod crawl;
@@ -32,7 +35,8 @@ fn main() {
             (about: "Search for similar commands")
             (@arg command: +required "Command hint")
         )
-    ).get_matches();
+    )
+    .get_matches();
 
     if matches.is_present("debug") {
         env::set_var("RUST_LOG", "mii");
@@ -45,16 +49,27 @@ fn main() {
 
     let datadir = match matches.value_of("datadir") {
         Some(x) => x.to_string(),
-        None => dirs::data_local_dir().unwrap().join("mii").to_string_lossy().to_string(),
+        None => dirs::data_local_dir()
+            .unwrap()
+            .join("mii")
+            .to_string_lossy()
+            .to_string(),
     };
 
     let datadir = Path::new(&datadir);
 
     if let Err(e) = DirBuilder::new().recursive(true).create(&datadir) {
-        panic!("Failed to initialize data directory in {} : {}", datadir.display(), e.to_string());
+        panic!(
+            "Failed to initialize data directory in {} : {}",
+            datadir.display(),
+            e.to_string()
+        );
     }
 
-    let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap_or(String::new()), datadir.join("index.db"));
+    let mut ctrl = engine::Engine::new(
+        env::var("MODULEPATH").unwrap_or(String::new()),
+        datadir.join("index.db"),
+    );
 
     if let Some(_) = matches.subcommand_matches("sync") {
         ctrl.sync_light();

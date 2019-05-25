@@ -59,15 +59,24 @@ impl Engine {
         debug!("Starting crawl phase.");
         let crawl_time = SystemTime::now();
         let files = crawl::crawl_sync(self.modulepath.clone());
-        debug!("Finished crawl phase in {} ms.", SystemTime::now().duration_since(crawl_time).unwrap().as_millis());
+        debug!(
+            "Finished crawl phase in {} ms.",
+            SystemTime::now()
+                .duration_since(crawl_time)
+                .unwrap()
+                .as_millis()
+        );
 
         /* verify phase: multithreaded! */
 
         debug!("Starting verify phase ({})..", files.len());
         let verify_time = SystemTime::now();
-        let (tx, rx): (mpsc::Sender<Vec<crawl::ModuleFile>>, mpsc::Receiver<Vec<crawl::ModuleFile>>) = mpsc::channel();
+        let (tx, rx): (
+            mpsc::Sender<Vec<crawl::ModuleFile>>,
+            mpsc::Receiver<Vec<crawl::ModuleFile>>,
+        ) = mpsc::channel();
 
-        /* 
+        /*
          * each worker thread will perform verify ops and send back modules requiring updates
          * through the mpsc.
          */
@@ -82,7 +91,9 @@ impl Engine {
 
             workers.push(thread::spawn(move || {
                 let mut db = db::DB::new(Path::new(&db_copy));
-                tx_copy.send(db.compare_modules(chunk_copy.to_vec(), nonce)).unwrap();
+                tx_copy
+                    .send(db.compare_modules(chunk_copy.to_vec(), nonce))
+                    .unwrap();
             }));
         }
 
@@ -90,12 +101,12 @@ impl Engine {
 
         let mut verify_results = Vec::new();
 
-        /* 
+        /*
          * seems hacky -- but we know exactly how many messages to expect through the mpsc
          * each worker will send exactly one result batch.
          *
          * TODO: any panics in worker threads will stop everything. the total numebr of messages
-         * will never be received and the engine will hang indefinitely (no bueno). there should be 
+         * will never be received and the engine will hang indefinitely (no bueno). there should be
          * proper callbacks or at least polling for panics from the main thread
          */
         for _ in workers.iter() {
@@ -106,7 +117,13 @@ impl Engine {
             worker.join().expect("verify thread panicked, aborting");
         }
 
-        debug!("Finished verify phase in {} ms.", SystemTime::now().duration_since(verify_time).unwrap().as_millis());
+        debug!(
+            "Finished verify phase in {} ms.",
+            SystemTime::now()
+                .duration_since(verify_time)
+                .unwrap()
+                .as_millis()
+        );
         debug!("Starting analysis phase ({})..", verify_results.len());
 
         let analysis_time = SystemTime::now();
@@ -119,7 +136,15 @@ impl Engine {
 
             analysis_workers.push(thread::spawn(move || {
                 let mut db = db::DB::new(Path::new(&db_copy));
-                db.update_modules(&chunk_copy.to_vec().into_iter().map(|x| analysis::analyze(x)).filter_map(Result::ok).collect(), nonce);
+                db.update_modules(
+                    &chunk_copy
+                        .to_vec()
+                        .into_iter()
+                        .map(|x| analysis::analyze(x))
+                        .filter_map(Result::ok)
+                        .collect(),
+                    nonce,
+                );
             }));
         }
 
@@ -127,7 +152,13 @@ impl Engine {
             worker.join().expect("analysis thread panicked, aborting");
         }
 
-        debug!("Finished analysis phase in {} ms.", SystemTime::now().duration_since(analysis_time).unwrap().as_millis());
+        debug!(
+            "Finished analysis phase in {} ms.",
+            SystemTime::now()
+                .duration_since(analysis_time)
+                .unwrap()
+                .as_millis()
+        );
         debug!("Starting orphan phase..");
         self.db_conn.flush_orphans(nonce);
 

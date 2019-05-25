@@ -12,7 +12,7 @@ use fasthash::xx;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use walkdir::WalkDir;
 
@@ -63,14 +63,17 @@ pub fn crawl_sync(modulepath: String) -> Vec<ModuleFile> {
                     modtype: loc.modtype,
                     hash: Some(xx::hash32(data)),
                 });
-            },
+            }
         }
     }
 
     walker.join().expect("failed to join FS walker");
 
     if num_module_files == 0 {
-        warn!("No module files found in MODULEPATH \"{}\". Check your configuration!", modulepath);
+        warn!(
+            "No module files found in MODULEPATH \"{}\". Check your configuration!",
+            modulepath
+        );
     }
 
     output
@@ -81,14 +84,18 @@ fn crawl_gen(roots: Vec<String>, tx: Sender<Option<ModuleFile>>) {
         crawl_dir(&Path::new(&root), &tx);
     }
 
-    tx.send(None).expect("unexpected failure terminating walker stream");
+    tx.send(None)
+        .expect("unexpected failure terminating walker stream");
 }
 
 fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
     let walker = WalkDir::new(root).into_iter();
 
     for entry in walker.filter_entry(|e| {
-        e.file_name().to_str().map(|s| !s.starts_with(".")).unwrap_or(false)
+        e.file_name()
+            .to_str()
+            .map(|s| !s.starts_with("."))
+            .unwrap_or(false)
     }) {
         if let Ok(entry) = entry {
             if entry.file_type().is_file() {
@@ -97,7 +104,10 @@ fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
 
                 let (mod_type, mod_code) = match path.extension() {
                     Some(ext) => match ext.to_str() {
-                        Some("lua") => (ModuleType::LMOD, code_path.parent().unwrap().join(path.file_stem().unwrap())),
+                        Some("lua") => (
+                            ModuleType::LMOD,
+                            code_path.parent().unwrap().join(path.file_stem().unwrap()),
+                        ),
                         _ => (ModuleType::TCL, code_path.to_path_buf()),
                     },
                     None => (ModuleType::TCL, code_path.to_path_buf()), /* noice */
@@ -108,7 +118,8 @@ fn crawl_dir(root: &Path, tx: &Sender<Option<ModuleFile>>) {
                     code: mod_code.to_string_lossy().to_string(),
                     modtype: mod_type,
                     hash: None,
-                })).expect("unexpected mpsc send fail");
+                }))
+                .expect("unexpected mpsc send fail");
             }
         }
     }

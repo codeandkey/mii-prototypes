@@ -10,7 +10,7 @@
  * a great amount.
  */
 
-use rusqlite::{Connection, Result, NO_PARAMS, params};
+use rusqlite::{params, Connection, Result, NO_PARAMS};
 use std::path::Path;
 
 use crate::analysis;
@@ -31,10 +31,10 @@ impl DB {
             Ok(conn) => {
                 /* initialize database tables */
                 conn.execute("CREATE TABLE IF NOT EXISTS modules (path TEXT UNIQUE, code TEXT, nonce INT, hash BIGINT, bins TEXT)", NO_PARAMS).unwrap();
-            },
+            }
             Err(e) => {
                 panic!("Failed to open database file {}: {}", db_path.display(), e);
-            },
+            }
         }
     }
 
@@ -43,13 +43,11 @@ impl DB {
             Ok(conn) => {
                 conn.pragma_update(None, "journal_mode", &"WAL").unwrap();
 
-                DB {
-                    conn: conn,
-                }
-            },
+                DB { conn: conn }
+            }
             Err(e) => {
                 panic!("Failed to open database file: {}", e);
-            },
+            }
         }
     }
 
@@ -62,13 +60,26 @@ impl DB {
      * compare_modules checks if there is an up-to-date entry in the local db
      */
 
-    pub fn compare_modules(&mut self, local: Vec<crawl::ModuleFile>, nonce: u32) -> Vec<crawl::ModuleFile> {
+    pub fn compare_modules(
+        &mut self,
+        local: Vec<crawl::ModuleFile>,
+        nonce: u32,
+    ) -> Vec<crawl::ModuleFile> {
         let tx = self.conn.transaction().unwrap();
         let ret;
 
         {
-            let mut stmt = tx.prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?").unwrap();
-            ret = local.into_iter().filter(|x| stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash]).unwrap() < 1).collect();
+            let mut stmt = tx
+                .prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?")
+                .unwrap();
+            ret = local
+                .into_iter()
+                .filter(|x| {
+                    stmt.execute(params![nonce, x.code, x.path.to_string_lossy(), x.hash])
+                        .unwrap()
+                        < 1
+                })
+                .collect();
         }
 
         tx.commit().expect("transaction failed");
@@ -86,7 +97,14 @@ impl DB {
             let mut stmt = tx.prepare("INSERT INTO modules VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(path) DO UPDATE SET code=?2, nonce=?3, hash=?4, bins=?5").unwrap();
 
             for m in res {
-                stmt.execute(params![m.file.path.to_string_lossy(), m.file.code, nonce, m.file.hash, m.bins.join(":")]).unwrap();
+                stmt.execute(params![
+                    m.file.path.to_string_lossy(),
+                    m.file.code,
+                    nonce,
+                    m.file.hash,
+                    m.bins.join(":")
+                ])
+                .unwrap();
             }
         }
 
@@ -114,7 +132,9 @@ impl DB {
              * drop the orphaned module entries
              */
 
-            res = tx.execute("DELETE FROM modules WHERE nonce!=$1", params![nonce]).unwrap();
+            res = tx
+                .execute("DELETE FROM modules WHERE nonce!=$1", params![nonce])
+                .unwrap();
         }
 
         tx.commit().expect("transaction failed");
@@ -127,7 +147,10 @@ impl DB {
 
     pub fn search_bin(&self, command: String) -> Vec<BinResult> {
         let cmd_param = format!("%{}%", command);
-        let mut stmt = self.conn.prepare("SELECT bins, code FROM modules WHERE bins LIKE ?").unwrap();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT bins, code FROM modules WHERE bins LIKE ?")
+            .unwrap();
 
         stmt.query_map(params![cmd_param], |row| {
             let row_bin_col: String = row.get(0).unwrap();
@@ -141,7 +164,11 @@ impl DB {
             }
 
             Ok(None)
-        }).unwrap().filter_map(Result::ok).filter_map(|x| x).collect()
+        })
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter_map(|x| x)
+        .collect()
     }
 
     /*
@@ -150,26 +177,33 @@ impl DB {
 
     pub fn search_bin_fuzzy(&self, command: String) -> Vec<BinResult> {
         let cmd_param = format!("%{}%", command);
-        let mut stmt = self.conn.prepare("SELECT bins, code FROM modules WHERE bins LIKE ?").unwrap();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT bins, code FROM modules WHERE bins LIKE ?")
+            .unwrap();
 
-        let vecs: Vec<Vec<BinResult>> = stmt.query_map(params![cmd_param], |row| {
-            let row_bin_col: String = row.get(0).unwrap();
-            let row_bins: Vec<String> = row_bin_col.split(":").map(|x| x.to_string()).collect();
+        let vecs: Vec<Vec<BinResult>> = stmt
+            .query_map(params![cmd_param], |row| {
+                let row_bin_col: String = row.get(0).unwrap();
+                let row_bins: Vec<String> = row_bin_col.split(":").map(|x| x.to_string()).collect();
 
-            let mut out = Vec::new();
-            let row_code: String = row.get(1).unwrap();
+                let mut out = Vec::new();
+                let row_code: String = row.get(1).unwrap();
 
-            for bin in row_bins {
-                if bin.contains(&command) {
-                    out.push(BinResult {
-                        command: bin,
-                        code: row_code.clone(),
-                    });
+                for bin in row_bins {
+                    if bin.contains(&command) {
+                        out.push(BinResult {
+                            command: bin,
+                            code: row_code.clone(),
+                        });
+                    }
                 }
-            }
 
-            Ok(out)
-        }).unwrap().filter_map(Result::ok).collect();
+                Ok(out)
+            })
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
 
         vecs.into_iter().flatten().collect()
     }
