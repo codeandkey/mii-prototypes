@@ -64,7 +64,7 @@ impl DB {
 
     pub fn compare_modules(&mut self, local: Vec<crawl::ModuleFile>, nonce: u32) -> Vec<crawl::ModuleFile> {
         let tx = self.conn.transaction().unwrap();
-        let mut ret = Vec::new();
+        let ret;
 
         {
             let mut stmt = tx.prepare("UPDATE modules SET nonce=?, code=? WHERE path=? AND hash=?").unwrap();
@@ -107,7 +107,7 @@ impl DB {
          */
 
         let tx = self.conn.transaction().unwrap();
-        let mut res = 0;
+        let res;
 
         {
             /*

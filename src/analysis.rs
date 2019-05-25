@@ -10,8 +10,7 @@ use regex::{Regex, RegexBuilder};
 use std::fs;
 use std::io;
 
-const lmod_path_reg_src: &'static str = r#"^\s*prepend_path\s*\(\s*"PATH"\s*,\s*"([^"]+)"\s*(?:,\s*":"\s*)?\)\s*$"#;
-//const lmod_path_reg_src: &'static str = r#"^\s*(prepend_path)\s*\(.*$"#;
+const LMOD_PATH_REG_SRC: &'static str = r#"^\s*prepend_path\s*\(\s*"PATH"\s*,\s*"([^"]+)"\s*(?:,\s*":"\s*)?\)\s*$"#;
 
 pub struct Info {
     pub file: crawl::ModuleFile,
@@ -39,10 +38,10 @@ fn analyze_bins(contents: &String, modtype: &crawl::ModuleType) -> Vec<String> {
 
 fn extract_lmod_paths(contents: &String) -> Vec<String> {
     lazy_static! {
-        static ref lmod_path_reg: Regex = RegexBuilder::new(lmod_path_reg_src).multi_line(true).build().unwrap();
+        static ref LMOD_PATH_REG: Regex = RegexBuilder::new(LMOD_PATH_REG_SRC).multi_line(true).build().unwrap();
     }
 
-    lmod_path_reg.captures_iter(contents).map(|x| x[1].to_string()).collect()
+    LMOD_PATH_REG.captures_iter(contents).map(|x| x[1].to_string()).collect()
 }
 
 fn search_path(path: String) -> Vec<String> {
@@ -51,10 +50,8 @@ fn search_path(path: String) -> Vec<String> {
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries {
             if let Ok(entry) = entry {
-                if let Ok(file_type) = entry.file_type() {
-                    if is_executable::is_executable(entry.path()) {
-                        output.push(entry.path().file_name().unwrap().to_string_lossy().to_string());
-                    }
+                if is_executable::is_executable(entry.path()) {
+                    output.push(entry.path().file_name().unwrap().to_string_lossy().to_string());
                 }
             }
         } 

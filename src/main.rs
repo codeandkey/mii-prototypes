@@ -56,11 +56,11 @@ fn main() {
 
     let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap_or(String::new()), datadir.join("index.db"));
 
-    if let Some(matches) = matches.subcommand_matches("sync") {
+    if let Some(_) = matches.subcommand_matches("sync") {
         ctrl.sync_light();
     }
 
-    if let Some(matches) = matches.subcommand_matches("build") {
+    if let Some(_) = matches.subcommand_matches("build") {
         ctrl.destroy_db();
         println!("[mii] Rebuilding index..");
         ctrl.sync_light();
