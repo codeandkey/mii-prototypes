@@ -9,10 +9,8 @@
  */
 
 use fasthash::xx;
-use std::fs;
 use std::fs::File;
 use std::io::Read;
-use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;

@@ -9,8 +9,6 @@ use crate::crawl;
 use regex::{Regex, RegexBuilder};
 use std::fs;
 use std::io;
-use std::os::unix::fs::PermissionsExt; /* for modelines */
-use std::path::{Path, PathBuf};
 
 const lmod_path_reg_src: &'static str = r#"^\s*prepend_path\s*\(\s*"PATH"\s*,\s*"([^"]+)"\s*(?:,\s*":"\s*)?\)\s*$"#;
 //const lmod_path_reg_src: &'static str = r#"^\s*(prepend_path)\s*\(.*$"#;

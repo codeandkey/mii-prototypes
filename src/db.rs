@@ -10,8 +10,8 @@
  * a great amount.
  */
 
-use rusqlite::{Connection, Result, NO_PARAMS, params, Statement};
-use std::path::{Path, PathBuf};
+use rusqlite::{Connection, Result, NO_PARAMS, params};
+use std::path::Path;
 
 use crate::analysis;
 use crate::crawl;

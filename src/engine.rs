@@ -12,7 +12,6 @@ use crate::crawl;
 use crate::db;
 
 use std::cmp;
-use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;

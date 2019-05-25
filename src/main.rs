@@ -7,11 +7,9 @@ mod crawl;
 mod db;
 mod engine;
 
-use rand;
 use std::env;
 use std::fs::DirBuilder;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     let matches = clap_app!(mii =>
