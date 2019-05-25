@@ -20,11 +20,11 @@ fn main() {
         (about: "Module Inverted Index")
         (@arg debug: -d --debug "Enable verbose logging to stderr")
         (@arg datadir: -s --datadir +takes_value "Override data directory")
-        (@subcommand verify =>
-            (about: "Verify and synchronize module index")
+        (@subcommand sync =>
+            (about: "Synchronize module index")
         )
         (@subcommand build =>
-            (about: "Build a clean module index")
+            (about: "Rebuild module index")
         )
         (@subcommand exact =>
             (about: "Search for an exact command")
@@ -54,12 +54,14 @@ fn main() {
 
     let mut ctrl = engine::Engine::new(env::var("MODULEPATH").unwrap_or(String::new()), datadir.join("index.db"));
 
-    if let Some(matches) = matches.subcommand_matches("verify") {
+    if let Some(matches) = matches.subcommand_matches("sync") {
         ctrl.sync_light();
     }
 
     if let Some(matches) = matches.subcommand_matches("build") {
-        panic!("not implemented yet");
+        ctrl.destroy_db();
+        println!("[mii] Rebuilding index..");
+        ctrl.sync_light();
     }
 
     if let Some(matches) = matches.subcommand_matches("exact") {

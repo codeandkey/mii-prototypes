@@ -143,4 +143,11 @@ impl DB {
             Ok(None)
         }).unwrap().filter_map(Result::ok).filter_map(|x| x).collect()
     }
+
+    /*
+     * purge() clears out the whole module table
+     */
+    pub fn purge(&self) {
+        self.conn.execute("DELETE FROM modules", NO_PARAMS).unwrap();
+    }
 }

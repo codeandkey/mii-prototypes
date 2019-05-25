@@ -135,6 +135,10 @@ impl Engine {
         debug!("All done!");
     }
 
+    pub fn destroy_db(&self) {
+        self.db_conn.purge();
+    }
+
     pub fn search_bin_exact(&self, cmd: String) -> Vec<db::BinResult> {
         self.db_conn.search_bin(cmd)
     }
