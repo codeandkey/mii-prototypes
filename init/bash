@@ -17,7 +17,8 @@ if [ ! -x "$MII_BIN" ]; then
     return
 fi
 
-$MII_BIN sync
+# run as bg job in a subshell, will stay quiet
+($MII_BIN sync &)
 
 if ! type module 2>&1 >/dev/null; then
     echo "[mii] module command not defined, will not autoload modules"
