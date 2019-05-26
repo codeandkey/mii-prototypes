@@ -1,0 +1,13 @@
+#!/bin/env sh
+# mii install script
+
+prefix="/"
+[[ -n "$1" ]] && prefix=$1
+
+echo "installing to $prefix ..."
+
+cargo install --path "$(dirname $0)" --root "$prefix" || exit 1
+mkdir -p $prefix/share/mii/init || exit 1
+cp -rv $(dirname $0)/init/* $prefix/share/mii/init || exit 1
+
+echo "mii installed successfully!"
