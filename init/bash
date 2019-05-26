@@ -2,6 +2,9 @@
 # mii bash init
 # overrides the 'command not found' handler to automatically search for modules
 
+# don't do anything unless this is a login shell
+shopt -q login_shell || return
+
 SRC_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 MII_PREFIX=${SRC_DIR}/../../../
 MII_BIN=${MII_PREFIX}/bin/mii
@@ -14,7 +17,7 @@ if [ ! -x "$MII_BIN" ]; then
     return
 fi
 
-$MII_BIN build
+$MII_BIN sync
 
 if ! type module 2>&1 >/dev/null; then
     echo "[mii] module command not defined, will not autoload modules"

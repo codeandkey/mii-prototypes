@@ -6,6 +6,9 @@ SRC_DIR=$(dirname ${0:a})
 MII_PREFIX=${SRC_DIR}/../../../
 MII_BIN=${MII_PREFIX}/bin/mii
 
+# stop on non-login shells
+[[ -o login ]] || return
+
 # need to export for common to use it
 export MII_BIN
 
@@ -14,7 +17,7 @@ if [ ! -x "$MII_BIN" ]; then
     return
 fi
 
-$MII_BIN build
+$MII_BIN sync
 
 if ! type module 2>&1 >/dev/null; then
     echo "[mii] module command not defined, will not autoload modules"
